@@ -7,12 +7,15 @@
 #include <Common/typeid_cast.h>
 #include <Common/thread_local_rng.h>
 #include <Common/ThreadProfileEvents.h>
+#include <Common/CurrentThread.h>
 #include <Common/SensitiveDataMasker.h>
 #include <Common/FailPoint.h>
 #include <Common/FieldVisitorToString.h>
 
 #include <Interpreters/AsynchronousInsertQueue.h>
 #include <Interpreters/Cache/QueryResultCache.h>
+#include <Interpreters/InternalTextLogsQueue.h>
+#include <Interpreters/ProfileEventsExt.h>
 #include <IO/WriteBufferFromFile.h>
 #include <IO/WriteBufferFromVector.h>
 #include <IO/LimitReadBuffer.h>
@@ -21,6 +24,7 @@
 #include <QueryPipeline/BlockIO.h>
 #include <Processors/Transforms/getSourceFromASTInsertQuery.h>
 #include <Processors/Formats/Impl/NullFormat.h>
+#include <Processors/Formats/Impl/JSONEachRowWithProgressRowOutputFormat.h>
 
 #include <Parsers/ASTIdentifier.h>
 #include <Parsers/ASTInsertQuery.h>
@@ -2014,6 +2018,46 @@ void executeQuery(
                     previous_progress_callback(progress);
                 output_format->onProgress(progress);
             });
+
+            /// For JSONEachRowWithProgress, create and set logs and profile events queues
+            const bool is_json_progress_format = (format_name == "JSONEachRowWithProgress" || format_name == "JSONStringsEachRowWithProgress");
+            if (is_json_progress_format)
+            {
+                if (auto * json_format = dynamic_cast<JSONEachRowWithProgressRowOutputFormat *>(output_format.get()))
+                {
+                    /// Get existing queues or create new ones if needed
+                    auto logs_queue = CurrentThread::getInternalTextLogsQueue();
+                    auto profile_queue = CurrentThread::getInternalProfileEventsQueue();
+                    
+                    /// Create logs queue if not exists and logs are enabled
+                    if (!logs_queue)
+                    {
+                        const auto & context_settings = context->getSettingsRef();
+                        const auto client_logs_level = context_settings[Setting::send_logs_level];
+                        
+                        if (client_logs_level != LogsLevel::none)
+                        {
+                            logs_queue = std::make_shared<InternalTextLogsQueue>();
+                            logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
+                            logs_queue->setSourceRegexp(context_settings[Setting::send_logs_source_regexp]);
+                            CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
+                        }
+                    }
+                    
+                    /// Create profile events queue if not exists
+                    if (!profile_queue)
+                    {
+                        profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
+                        CurrentThread::attachInternalProfileEventsQueue(profile_queue);
+                    }
+                    
+                    /// Pass queues to format for processing
+                    if (logs_queue)
+                        json_format->setLogsQueue(logs_queue);
+                    if (profile_queue)
+                        json_format->setProfileEventsQueue(profile_queue);
+                }
+            }
 
             result_details.content_type = FormatFactory::instance().getContentType(format_name, output_format_settings);
             result_details.format = format_name;

@@ -8,4 +8,9 @@ ${CLICKHOUSE_CURL} -sS ${CLICKHOUSE_URL} -d "drop table if exists test_progress"
 ${CLICKHOUSE_CURL} -sS ${CLICKHOUSE_URL} -d "create table test_progress (x UInt64, y UInt64, d Date, a Array(UInt64), s String) engine=MergeTree() order by x"
 ${CLICKHOUSE_CURL} -sS ${CLICKHOUSE_URL} -d "insert into test_progress select number as x, number + 1 as y, toDate(number) as d, range(number % 10) as a, repeat(toString(number), 10) as s from numbers(200000)"
 ${CLICKHOUSE_CURL} -sS ${CLICKHOUSE_URL} -d "SELECT * from test_progress FORMAT JSONEachRowWithProgress" | grep -v --text "progress" | grep -v --text "rows_before_limit_at_least" | wc -l
+
+# Test that logs and profile events are not included by default
+echo "Test with logs/events disabled (default):"
+${CLICKHOUSE_CURL} -sS ${CLICKHOUSE_URL} -d "SELECT * from test_progress LIMIT 10 FORMAT JSONEachRowWithProgress" | grep -E '"log":|"profile_events":' | wc -l
+
 ${CLICKHOUSE_CURL} -sS ${CLICKHOUSE_URL} -d "drop table test_progress";

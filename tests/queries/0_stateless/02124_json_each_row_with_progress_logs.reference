@@ -1,0 +1,14 @@
+Test 1: Basic logs output
+1
+Test 2: No logs when disabled
+0
+Test 3: Log structure validation
+1
+Test 4: Logs with longer query
+1
+Test 5: Different log levels
+Log level trace: found logs
+Log level debug: found logs
+Log level information: found logs
+Log level warning: found logs
+Log level error: found logs

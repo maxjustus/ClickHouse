@@ -901,6 +901,12 @@ Deserialize maps columns as JSON arrays of tuples.
 
 Disabled by default.
 )", 0) \
+    DECLARE(Bool, output_format_json_include_logs, false, R"(
+Include server text logs in JSONEachRowWithProgress format output when send_logs_level is enabled.
+)", 0) \
+    DECLARE(Bool, output_format_json_include_profile_events, false, R"(
+Include ProfileEvent counters in JSONEachRowWithProgress format output.
+)", 0) \
     \
     DECLARE(String, format_json_object_each_row_column_for_object_name, "", R"(
 The name of column that will be used for storing/writing object names in [JSONObjectEachRow](/interfaces/formats/JSONObjectEachRow) format.

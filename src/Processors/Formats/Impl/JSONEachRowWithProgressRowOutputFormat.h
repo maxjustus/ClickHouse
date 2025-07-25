@@ -1,7 +1,9 @@
 #pragma once
 
+#include <Interpreters/InternalTextLogsQueue.h>
+#include <Interpreters/ProfileEventsExt.h>
 #include <Processors/Formats/Impl/JSONEachRowRowOutputFormat.h>
-#include <mutex>
+#include <Common/ThreadStatus.h>
 
 namespace DB
 {
@@ -10,6 +12,14 @@ class JSONEachRowWithProgressRowOutputFormat final : public JSONEachRowRowOutput
 {
 public:
     using JSONEachRowRowOutputFormat::JSONEachRowRowOutputFormat;
+
+    /// Set the queue for receiving server text logs. The logs will be included in the output
+    /// when settings.json.include_logs is true and send_logs_level is set.
+    void setLogsQueue(InternalTextLogsQueuePtr logs_queue_) { logs_queue = logs_queue_; }
+
+    /// Set the queue for receiving ProfileEvents counters. The events will be included in the output
+    /// when settings.json.include_profile_events is true.
+    void setProfileEventsQueue(InternalProfileEventsQueuePtr profile_events_queue_) { profile_events_queue = profile_events_queue_; }
 
 private:
     bool supportTotals() const override { return true; }
@@ -38,6 +48,17 @@ private:
     }
 
     void writeSpecialRow(const char * kind, const Columns & columns, size_t row_num);
+
+    /// Write pending log entries from the logs queue as JSON objects
+    void writeLogs();
+
+    /// Write accumulated ProfileEvents counters as JSON objects
+    void writeProfileEvents();
+
+    InternalTextLogsQueuePtr logs_queue;
+    InternalProfileEventsQueuePtr profile_events_queue;
+    ProfileEvents::ThreadIdToCountersSnapshot last_sent_snapshots;
+    String host_name;
 };
 
 }

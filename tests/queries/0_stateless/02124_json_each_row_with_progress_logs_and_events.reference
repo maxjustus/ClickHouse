@@ -1,0 +1,9 @@
+Test 1: Both logs and profile events enabled
+1
+1
+5
+1
+Test 2: Validate JSON structure with all types
+1
+Test 3: Progress updates trigger logs and events output
+3

@@ -1,0 +1,10 @@
+Test 1: Basic profile events output
+1
+Test 2: No profile events when disabled
+0
+Test 3: Profile events structure validation
+1
+Test 4: Profile events contain counters
+1
+Test 5: Profile events with aggregation
+1
