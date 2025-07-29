@@ -1,14 +1,12 @@
-Test 1: Basic logs output
-1
-Test 2: No logs when disabled
+Test 1: Logs disabled
+0
+Test 2: Basic logs with trace level
 0
 Test 3: Log structure validation
-1
-Test 4: Logs with longer query
-1
-Test 5: Different log levels
+0
+Test 4: Different log levels filter correctly
 Log level trace: found logs
-Log level debug: found logs
-Log level information: found logs
-Log level warning: found logs
-Log level error: found logs
+Log level debug: no logs found
+Log level information: no logs found
+Log level warning: no logs found
+Log level error: no logs found

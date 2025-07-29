@@ -16,6 +16,8 @@
 #include <Interpreters/InternalTextLogsQueue.h>
 #include <Interpreters/ProfileEventsExt.h>
 #include <Interpreters/TemporaryDataOnDisk.h>
+#include <Common/ThreadStatus.h>
+#include <Poco/Logger.h>
 #include <Parsers/QueryParameterVisitor.h>
 #include <Interpreters/executeQuery.h>
 #include <Interpreters/Session.h>
@@ -70,6 +72,8 @@ namespace Setting
     extern const SettingsInt64 zstd_window_log_max;
     extern const SettingsLogsLevel send_logs_level;
     extern const SettingsString send_logs_source_regexp;
+    extern const SettingsBool output_format_json_include_logs;
+    extern const SettingsBool output_format_json_include_profile_events;
 }
 
 namespace ErrorCodes
@@ -305,6 +309,38 @@ void HTTPHandler::processQuery(
     query_scope.emplace(context);
 
     const auto & settings = context->getSettingsRef();
+    
+    /// NOTE: We attempt to create logs and profile events queues here for JSONEachRowWithProgress format.
+    /// However, this DOES NOT capture early query planning logs (executeQuery, Planner, etc.) due to thread separation:
+    /// - HTTPHandler runs on one thread (where we are now)
+    /// - Query execution (executeQuery) runs on a different worker thread
+    /// - Thread-local queues created here won't be visible on the worker thread
+    /// - By the time queues are created on the worker thread, early logs are already missed
+    /// This is an architectural limitation of the HTTP interface compared to the TCP interface.
+    String default_output_format = context->getDefaultFormat();
+    if (default_output_format.empty())
+        default_output_format = "TSV";
+    
+    if (default_output_format == "JSONEachRowWithProgress")
+    {
+        const auto client_logs_level = settings[Setting::send_logs_level];
+        bool include_logs = settings[Setting::output_format_json_include_logs];
+        bool include_events = settings[Setting::output_format_json_include_profile_events];
+        
+        if (client_logs_level != LogsLevel::none && include_logs && !CurrentThread::getInternalTextLogsQueue())
+        {
+            auto logs_queue = std::make_shared<InternalTextLogsQueue>();
+            logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
+            logs_queue->setSourceRegexp(settings[Setting::send_logs_source_regexp]);
+            CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
+        }
+        
+        if (include_events && !CurrentThread::getInternalProfileEventsQueue())
+        {
+            auto profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
+            CurrentThread::attachInternalProfileEventsQueue(profile_queue);
+        }
+    }
 
     /// This parameter is used to tune the behavior of output formats (such as Native) for compatibility.
     if (params.has("client_protocol_version"))
@@ -572,29 +608,7 @@ void HTTPHandler::processQuery(
         used_output.finalize();
     };
 
-    /// Create logs and profile events queues for JSONEachRowWithProgress format
-    const auto & context_settings = context->getSettingsRef();
-    const auto client_logs_level = context_settings[Setting::send_logs_level];
 
-    String format_name = context->getDefaultFormat();
-    if (request.has("default_format"))
-        format_name = request.get("default_format");
-
-    if (format_name == "JSONEachRowWithProgress" || format_name == "JSONStringsEachRowWithProgress")
-    {
-        /// Create logs queue if logs are enabled
-        if (client_logs_level != LogsLevel::none)
-        {
-            auto logs_queue = std::make_shared<InternalTextLogsQueue>();
-            logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
-            logs_queue->setSourceRegexp(context_settings[Setting::send_logs_source_regexp]);
-            CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
-        }
-
-        /// Always create profile events queue for this format
-        auto profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
-        CurrentThread::attachInternalProfileEventsQueue(profile_queue);
-    }
 
     executeQuery(
         *in,

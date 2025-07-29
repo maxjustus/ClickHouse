@@ -91,6 +91,17 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
+namespace DB
+{
+namespace Setting
+{
+    extern const SettingsLogsLevel send_logs_level;
+    extern const SettingsString send_logs_source_regexp;
+    extern const SettingsBool output_format_json_include_logs;
+    extern const SettingsBool output_format_json_include_profile_events;
+}
+}
+
 namespace ProfileEvents
 {
     extern const Event Query;
@@ -985,6 +996,41 @@ static BlockIO executeQueryImpl(
     ImplicitTransactionControlExecutorPtr implicit_tcl_executor)
 {
     const bool internal = flags.internal;
+
+    /// Create logs and profile events queues early for JSONEachRowWithProgress format.
+    /// NOTE: For HTTP requests, we still miss the very early logs (logQuery at line 1231 below)
+    /// because this code runs on the query execution thread, not the HTTPHandler thread.
+    /// The queues created in HTTPHandler are not visible here due to thread-local storage.
+    /// This is the earliest point we can create queues on the correct thread, but some logs
+    /// (executeQuery, early Planner logs) will already have been generated and missed.
+    if (!internal)
+    {
+        String default_output_format = context->getDefaultFormat();
+        if (default_output_format.empty())
+            default_output_format = "TSV";
+        
+        if (default_output_format == "JSONEachRowWithProgress")
+        {
+            const auto & settings = context->getSettingsRef();
+            const auto client_logs_level = settings[Setting::send_logs_level];
+            bool include_logs = settings[Setting::output_format_json_include_logs];
+            bool include_events = settings[Setting::output_format_json_include_profile_events];
+            
+            if (client_logs_level != LogsLevel::none && include_logs && !CurrentThread::getInternalTextLogsQueue())
+            {
+                auto logs_queue = std::make_shared<InternalTextLogsQueue>();
+                logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
+                logs_queue->setSourceRegexp(settings[Setting::send_logs_source_regexp]);
+                CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
+            }
+            
+            if (include_events && !CurrentThread::getInternalProfileEventsQueue())
+            {
+                auto profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
+                CurrentThread::attachInternalProfileEventsQueue(profile_queue);
+            }
+        }
+    }
 
     /// query_span is a special span, when this function exits, it's lifetime is not ended, but ends when the query finishes.
     /// Some internal queries might call this function recursively by setting 'internal' parameter to 'true',
@@ -2034,8 +2080,9 @@ void executeQuery(
                     {
                         const auto & context_settings = context->getSettingsRef();
                         const auto client_logs_level = context_settings[Setting::send_logs_level];
+                        bool include_logs = context_settings[Setting::output_format_json_include_logs];
                         
-                        if (client_logs_level != LogsLevel::none)
+                        if (client_logs_level != LogsLevel::none && include_logs)
                         {
                             logs_queue = std::make_shared<InternalTextLogsQueue>();
                             logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
@@ -2045,7 +2092,7 @@ void executeQuery(
                     }
                     
                     /// Create profile events queue if not exists
-                    if (!profile_queue)
+                    if (!profile_queue && context->getSettingsRef()[Setting::output_format_json_include_profile_events])
                     {
                         profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
                         CurrentThread::attachInternalProfileEventsQueue(profile_queue);

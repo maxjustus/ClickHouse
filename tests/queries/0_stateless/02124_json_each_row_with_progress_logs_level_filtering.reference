@@ -1,0 +1,12 @@
+Test 1: send_logs_level='trace' should show all log levels
+OK
+Test 2: send_logs_level='debug' should NOT show trace logs
+OK
+Test 3: send_logs_level='information' should NOT show debug or trace logs
+OK
+Test 4: send_logs_level='warning' should only show warning and above
+OK
+Test 5: send_logs_level='error' should only show error and above
+OK
+Test 6: send_logs_level='none' should show no logs
+OK
