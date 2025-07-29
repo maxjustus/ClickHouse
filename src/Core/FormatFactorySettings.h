@@ -2,9 +2,9 @@
 
 /// This header exists so we can share it between multiple setting objects that include format settings
 
-#include <Core/SettingsObsoleteMacros.h>
-#include <Core/SettingsFields.h>
 #include <Core/Defines.h>
+#include <Core/SettingsFields.h>
+#include <Core/SettingsObsoleteMacros.h>
 
 // clang-format off
 #if defined(__CLION_IDE__)

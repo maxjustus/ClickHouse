@@ -10,18 +10,42 @@
 namespace DB
 {
 
+namespace
+{
+constexpr size_t LOGS_COLUMNS_COUNT = 8;
+constexpr const char * JSON_KEY_META = "meta";
+constexpr const char * JSON_KEY_NAME = "name";
+constexpr const char * JSON_KEY_TYPE = "type";
+constexpr const char * JSON_KEY_ROW = "row";
+constexpr const char * JSON_KEY_PROGRESS = "progress";
+constexpr const char * JSON_KEY_LOG = "log";
+constexpr const char * JSON_KEY_PROFILE_EVENTS = "profile_events";
+constexpr const char * JSON_KEY_THREAD_ID = "thread_id";
+constexpr const char * JSON_KEY_EVENTS = "events";
+constexpr const char * JSON_KEY_EXCEPTION = "exception";
+constexpr const char * JSON_KEY_TOTALS = "totals";
+constexpr const char * JSON_KEY_MIN = "min";
+constexpr const char * JSON_KEY_MAX = "max";
+}
+
 void JSONEachRowWithProgressRowOutputFormat::writePrefix()
 {
-    writeCString("{\"meta\":[", *ostr);
+    writeCString("{\"", *ostr);
+    writeCString(JSON_KEY_META, *ostr);
+    writeCString("\":[", *ostr);
     bool first = true;
     for (const auto & elem : getInputs().front().getHeader())
     {
         if (!first)
             writeChar(',', *ostr);
         first = false;
-        writeCString("{\"name\":", *ostr);
+        writeCString("{\"", *ostr);
+        writeCString(JSON_KEY_NAME, *ostr);
+        writeCString("\":", *ostr);
         writeJSONString(elem.name, *ostr, settings);
-        writeCString(",\"type\":", *ostr);
+        writeCString(",\"", *ostr);
+        writeCString(JSON_KEY_TYPE, *ostr);
+        writeCString("\":", *ostr);
         writeJSONString(elem.type->getName(), *ostr, settings);
         writeChar('}', *ostr);
     }
@@ -35,7 +59,9 @@ void JSONEachRowWithProgressRowOutputFormat::writeSuffix()
 
 void JSONEachRowWithProgressRowOutputFormat::writeRowStartDelimiter()
 {
-    writeCString("{\"row\":{", *ostr);
+    writeCString("{\"", *ostr);
+    writeCString(JSON_KEY_ROW, *ostr);
+    writeCString("\":{", *ostr);
 }
 
 void JSONEachRowWithProgressRowOutputFormat::writeRowEndDelimiter()
@@ -64,24 +90,26 @@ void JSONEachRowWithProgressRowOutputFormat::writeSpecialRow(const char * kind, 
 
 void JSONEachRowWithProgressRowOutputFormat::writeTotals(const Columns & columns, size_t row_num)
 {
-    writeSpecialRow("totals", columns, row_num);
+    writeSpecialRow(JSON_KEY_TOTALS, columns, row_num);
 }
 
 void JSONEachRowWithProgressRowOutputFormat::writeMinExtreme(const Columns & columns, size_t row_num)
 {
-    writeSpecialRow("min", columns, row_num);
+    writeSpecialRow(JSON_KEY_MIN, columns, row_num);
 }
 
 void JSONEachRowWithProgressRowOutputFormat::writeMaxExtreme(const Columns & columns, size_t row_num)
 {
-    writeSpecialRow("max", columns, row_num);
+    writeSpecialRow(JSON_KEY_MAX, columns, row_num);
 }
 
 void JSONEachRowWithProgressRowOutputFormat::writeProgress(const Progress & value)
 {
     if (value.empty())
         return;
-    writeCString("{\"progress\":", *ostr);
+    writeCString("{\"", *ostr);
+    writeCString(JSON_KEY_PROGRESS, *ostr);
+    writeCString("\":", *ostr);
     value.writeJSON(*ostr, Progress::DisplayMode::Minimal);
     writeCString("}\n", *ostr);
 
@@ -106,7 +134,9 @@ void JSONEachRowWithProgressRowOutputFormat::finalizeImpl()
     }
     if (!exception_message.empty())
     {
-        writeCString("{\"exception\":", *ostr);
+        writeCString("{\"", *ostr);
+        writeCString(JSON_KEY_EXCEPTION, *ostr);
+        writeCString("\":", *ostr);
         writeJSONString(exception_message, *ostr, settings);
         writeCString("}\n", *ostr);
     }
@@ -130,7 +160,7 @@ void JSONEachRowWithProgressRowOutputFormat::writeLogs()
     while (logs_queue->tryPop(logs_columns))
     {
         /// Validate we have the expected number of columns
-        if (logs_columns.size() < 8)
+        if (logs_columns.size() < LOGS_COLUMNS_COUNT)
             continue;
 
         /// Validate all columns have the same size
@@ -150,7 +180,9 @@ void JSONEachRowWithProgressRowOutputFormat::writeLogs()
         /// Write each log entry as a JSON object
         for (size_t i = 0; i < num_rows; ++i)
         {
-            writeCString("{\"log\":{", *ostr);
+            writeCString("{\"", *ostr);
+            writeCString(JSON_KEY_LOG, *ostr);
+            writeCString("\":{", *ostr);
 
             writeCString("\"event_time\":\"", *ostr);
             UInt32 timestamp = logs_columns[0]->getUInt(i);
@@ -234,9 +266,15 @@ void JSONEachRowWithProgressRowOutputFormat::writeProfileEvents()
 
         for (const auto & [thread_id, events] : events_by_thread)
         {
-            writeCString("{\"profile_events\":{\"thread_id\":", *ostr);
+            writeCString("{\"", *ostr);
+            writeCString(JSON_KEY_PROFILE_EVENTS, *ostr);
+            writeCString("\":{\"", *ostr);
+            writeCString(JSON_KEY_THREAD_ID, *ostr);
+            writeCString("\":", *ostr);
             writeIntText(thread_id, *ostr);
-            writeCString(",\"events\":{", *ostr);
+            writeCString(",\"", *ostr);
+            writeCString(JSON_KEY_EVENTS, *ostr);
+            writeCString("\":{", *ostr);
 
             bool first = true;
             for (const auto & [name, value] : events)
@@ -257,26 +295,24 @@ void JSONEachRowWithProgressRowOutputFormat::writeProfileEvents()
 
 void registerOutputFormatJSONEachRowWithProgress(FormatFactory & factory)
 {
-    factory.registerOutputFormat("JSONEachRowWithProgress", [](
-            WriteBuffer & buf,
-            const Block & sample,
-            const FormatSettings & _format_settings)
-    {
-        FormatSettings settings = _format_settings;
-        settings.json.serialize_as_strings = false;
-        return std::make_shared<JSONEachRowWithProgressRowOutputFormat>(buf, std::make_shared<const Block>(sample), settings);
-    });
+    factory.registerOutputFormat(
+        "JSONEachRowWithProgress",
+        [](WriteBuffer & buf, const Block & sample, const FormatSettings & _format_settings)
+        {
+            FormatSettings settings = _format_settings;
+            settings.json.serialize_as_strings = false;
+            return std::make_shared<JSONEachRowWithProgressRowOutputFormat>(buf, std::make_shared<const Block>(sample), settings);
+        });
     factory.setContentType("JSONEachRowWithProgress", "application/json; charset=UTF-8");
 
-    factory.registerOutputFormat("JSONStringsEachRowWithProgress", [](
-            WriteBuffer & buf,
-            const Block & sample,
-            const FormatSettings & _format_settings)
-    {
-        FormatSettings settings = _format_settings;
-        settings.json.serialize_as_strings = true;
-        return std::make_shared<JSONEachRowWithProgressRowOutputFormat>(buf, std::make_shared<const Block>(sample), settings);
-    });
+    factory.registerOutputFormat(
+        "JSONStringsEachRowWithProgress",
+        [](WriteBuffer & buf, const Block & sample, const FormatSettings & _format_settings)
+        {
+            FormatSettings settings = _format_settings;
+            settings.json.serialize_as_strings = true;
+            return std::make_shared<JSONEachRowWithProgressRowOutputFormat>(buf, std::make_shared<const Block>(sample), settings);
+        });
     factory.setContentType("JSONStringsEachRowWithProgress", "application/json; charset=UTF-8");
 }
 
