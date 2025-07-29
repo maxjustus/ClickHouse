@@ -100,6 +100,29 @@ namespace Setting
     extern const SettingsBool output_format_json_include_logs;
     extern const SettingsBool output_format_json_include_profile_events;
 }
+
+/// Helper function to create logs and profile events queues for JSONEachRowWithProgress format
+static void createQueuesForJSONProgress(ContextPtr context)
+{
+    const auto & settings = context->getSettingsRef();
+    const auto client_logs_level = settings[Setting::send_logs_level];
+    bool include_logs = settings[Setting::output_format_json_include_logs];
+    bool include_events = settings[Setting::output_format_json_include_profile_events];
+    
+    if (client_logs_level != LogsLevel::none && include_logs && !CurrentThread::getInternalTextLogsQueue())
+    {
+        auto logs_queue = std::make_shared<InternalTextLogsQueue>();
+        logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
+        logs_queue->setSourceRegexp(settings[Setting::send_logs_source_regexp]);
+        CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
+    }
+    
+    if (include_events && !CurrentThread::getInternalProfileEventsQueue())
+    {
+        auto profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
+        CurrentThread::attachInternalProfileEventsQueue(profile_queue);
+    }
+}
 }
 
 namespace ProfileEvents
@@ -998,9 +1021,8 @@ static BlockIO executeQueryImpl(
     const bool internal = flags.internal;
 
     /// Create logs and profile events queues early for JSONEachRowWithProgress format.
-    /// NOTE: For HTTP requests, we still miss the very early logs (logQuery at line 1231 below)
+    /// NOTE: For HTTP requests, we still miss the very early logs (logQuery at line 1239 below)
     /// because this code runs on the query execution thread, not the HTTPHandler thread.
-    /// The queues created in HTTPHandler are not visible here due to thread-local storage.
     /// This is the earliest point we can create queues on the correct thread, but some logs
     /// (executeQuery, early Planner logs) will already have been generated and missed.
     if (!internal)
@@ -1010,26 +1032,7 @@ static BlockIO executeQueryImpl(
             default_output_format = "TSV";
         
         if (default_output_format == "JSONEachRowWithProgress")
-        {
-            const auto & settings = context->getSettingsRef();
-            const auto client_logs_level = settings[Setting::send_logs_level];
-            bool include_logs = settings[Setting::output_format_json_include_logs];
-            bool include_events = settings[Setting::output_format_json_include_profile_events];
-            
-            if (client_logs_level != LogsLevel::none && include_logs && !CurrentThread::getInternalTextLogsQueue())
-            {
-                auto logs_queue = std::make_shared<InternalTextLogsQueue>();
-                logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
-                logs_queue->setSourceRegexp(settings[Setting::send_logs_source_regexp]);
-                CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
-            }
-            
-            if (include_events && !CurrentThread::getInternalProfileEventsQueue())
-            {
-                auto profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
-                CurrentThread::attachInternalProfileEventsQueue(profile_queue);
-            }
-        }
+            createQueuesForJSONProgress(context);
     }
 
     /// query_span is a special span, when this function exits, it's lifetime is not ended, but ends when the query finishes.
@@ -2071,32 +2074,12 @@ void executeQuery(
             {
                 if (auto * json_format = dynamic_cast<JSONEachRowWithProgressRowOutputFormat *>(output_format.get()))
                 {
-                    /// Get existing queues or create new ones if needed
+                    /// Create queues if they don't exist
+                    createQueuesForJSONProgress(context);
+                    
+                    /// Get existing queues and pass to format
                     auto logs_queue = CurrentThread::getInternalTextLogsQueue();
                     auto profile_queue = CurrentThread::getInternalProfileEventsQueue();
-                    
-                    /// Create logs queue if not exists and logs are enabled
-                    if (!logs_queue)
-                    {
-                        const auto & context_settings = context->getSettingsRef();
-                        const auto client_logs_level = context_settings[Setting::send_logs_level];
-                        bool include_logs = context_settings[Setting::output_format_json_include_logs];
-                        
-                        if (client_logs_level != LogsLevel::none && include_logs)
-                        {
-                            logs_queue = std::make_shared<InternalTextLogsQueue>();
-                            logs_queue->max_priority = Poco::Logger::parseLevel(client_logs_level.toString());
-                            logs_queue->setSourceRegexp(context_settings[Setting::send_logs_source_regexp]);
-                            CurrentThread::attachInternalTextLogsQueue(logs_queue, client_logs_level);
-                        }
-                    }
-                    
-                    /// Create profile events queue if not exists
-                    if (!profile_queue && context->getSettingsRef()[Setting::output_format_json_include_profile_events])
-                    {
-                        profile_queue = std::make_shared<InternalProfileEventsQueue>(std::numeric_limits<int>::max());
-                        CurrentThread::attachInternalProfileEventsQueue(profile_queue);
-                    }
                     
                     /// Pass queues to format for processing
                     if (logs_queue)
