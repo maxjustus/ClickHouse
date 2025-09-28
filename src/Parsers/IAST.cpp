@@ -99,14 +99,25 @@ size_t IAST::size() const
 
 size_t IAST::checkSize(size_t max_size) const
 {
-    size_t res = 1;
-    for (const auto & child : children)
-        res += child->checkSize(max_size);
+    size_t total = 0;
+    std::vector<const IAST *> stack;
+    stack.reserve(children.size() + 1);
+    stack.push_back(this);
 
-    if (res > max_size)
-        throw Exception(ErrorCodes::TOO_BIG_AST, "AST is too big. Maximum: {}", max_size);
+    while (!stack.empty())
+    {
+        const IAST * node = stack.back();
+        stack.pop_back();
 
-    return res;
+        ++total;
+        if (total > max_size)
+            throw Exception(ErrorCodes::TOO_BIG_AST, "AST is too big. Maximum: {}", max_size);
+
+        for (const auto & child : node->children)
+            stack.push_back(child.get());
+    }
+
+    return total;
 }
 
 
