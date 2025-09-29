@@ -2,6 +2,7 @@
 
 #include <Common/assert_cast.h>
 #include <Common/checkStackSize.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <Common/quoteString.h>
 #include <Common/typeid_cast.h>
 
@@ -489,12 +490,13 @@ class ScopeStack::Index
 {
     /// Map column name -> Node.
     /// Use string_view as key which always points to Node::result_name.
-    std::unordered_map<std::string_view, const ActionsDAG::Node *> map;
+    boost::unordered_flat_map<std::string_view, const ActionsDAG::Node *> map;
     ActionsDAG::NodeRawConstPtrs & index;
 
 public:
     explicit Index(ActionsDAG::NodeRawConstPtrs & index_) : index(index_)
     {
+        map.reserve(index.size());
         for (const auto * node : index)
             map.emplace(node->result_name, node);
     }
