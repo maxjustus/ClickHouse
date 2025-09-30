@@ -1255,15 +1255,16 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifierFromAliases(const Ide
             auto cached_it = scope_to_resolve_alias_expression->aliases.alias_name_to_resolved_expression_node.find(identifier_bind_part);
             if (cached_it != scope_to_resolve_alias_expression->aliases.alias_name_to_resolved_expression_node.end() && cached_it->second)
             {
-                alias_node = cached_it->second->clone();
+                alias_node = cached_it->second;
                 resolved_from_cache = true;
             }
         }
 
         if (!resolved_from_cache)
+        {
             alias_node = original_alias_node->clone();
-
-        scope_to_resolve_alias_expression->aliases.node_to_remove_aliases.push_back(alias_node);
+            scope_to_resolve_alias_expression->aliases.node_to_remove_aliases.push_back(alias_node);
+        }
     }
 
     auto node_type = alias_node->getNodeType();
@@ -1325,7 +1326,7 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifierFromAliases(const Ide
         {
             auto & cached_map = scope_to_resolve_alias_expression->aliases.alias_name_to_resolved_expression_node;
             if (!resolved_from_cache && !cached_map.contains(identifier_bind_part))
-                cached_map.emplace(identifier_bind_part, alias_node->clone());
+                cached_map.emplace(identifier_bind_part, alias_node);
         }
     }
 
