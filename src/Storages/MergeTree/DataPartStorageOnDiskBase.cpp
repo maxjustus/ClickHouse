@@ -11,6 +11,7 @@
 #include <Interpreters/Context.h>
 #include <Storages/MergeTree/Backup.h>
 #include <Backups/BackupEntryFromImmutableFile.h>
+#include <Backups/BackupEntryFromSmallFile.h>
 #include <Backups/BackupEntryWrappedWith.h>
 #include <Backups/BackupSettings.h>
 #include <Disks/SingleDiskVolume.h>
@@ -408,6 +409,7 @@ void DataPartStorageOnDiskBase::backup(
 
     bool copy_encrypted = !backup_settings.decrypt_files_from_encrypted_disks;
     bool allow_checksums_from_remote_paths = backup_settings.allow_checksums_from_remote_paths;
+    UInt64 max_small_file_size = backup_settings.max_small_file_size_for_backup;
 
     auto backup_file = [&](const String & filepath)
     {
@@ -434,8 +436,20 @@ void DataPartStorageOnDiskBase::backup(
             file_hash = it->second.file_hash;
         }
 
-        BackupEntryPtr backup_entry = std::make_unique<BackupEntryFromImmutableFile>(
-            disk, filepath_on_disk, copy_encrypted, file_size, file_hash, allow_checksums_from_remote_paths);
+        BackupEntryPtr backup_entry;
+
+        /// Use BackupEntryFromSmallFile for small files (if size known and below threshold)
+        /// This allows embedding file contents directly in backup XML metadata
+        if (max_small_file_size > 0 && file_size.has_value() && file_size.value() <= max_small_file_size)
+        {
+            backup_entry = std::make_unique<BackupEntryFromSmallFile>(
+                disk, filepath_on_disk, getReadSettings(), copy_encrypted);
+        }
+        else
+        {
+            backup_entry = std::make_unique<BackupEntryFromImmutableFile>(
+                disk, filepath_on_disk, copy_encrypted, file_size, file_hash, allow_checksums_from_remote_paths);
+        }
 
         if (temp_dir_owner)
             backup_entry = wrapBackupEntryWith(std::move(backup_entry), temp_dir_owner);

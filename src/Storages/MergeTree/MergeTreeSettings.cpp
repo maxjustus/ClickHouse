@@ -1835,6 +1835,11 @@ namespace ErrorCodes
 
     **Default Value:** false
     )", EXPERIMENTAL) \
+    DECLARE(UInt64, max_small_file_size_for_backup, 0, R"(
+    The maximum size of a file to be embedded directly into the backup's XML file.
+    If a file's size is smaller or equal to this threshold, it will be embedded to reduce the number of files in the backup.
+    If set to 0, the global `max_small_file_size_for_backup` setting is used.
+    )", 0) \
     DECLARE(Bool, notify_newest_block_number, false, R"(
     Notify newest block number to SharedJoin or SharedSet. Only in ClickHouse Cloud.
     )", EXPERIMENTAL) \

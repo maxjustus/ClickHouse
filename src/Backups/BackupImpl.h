@@ -153,6 +153,8 @@ private:
     /// object_key -> file name, only used by lightweight snapshot
     std::unordered_map<String, String> file_object_keys TSA_GUARDED_BY(mutex);
     std::unordered_map<String, BackupFileInfo> lightweight_snapshot_file_infos TSA_GUARDED_BY(mutex);
+    /// Embedded file data for small files (stored directly in XML metadata)
+    std::map<String /* file_name */, String /* base64_data */> embedded_files TSA_GUARDED_BY(mutex);
 
     std::optional<UUID> uuid;
     time_t timestamp = 0;

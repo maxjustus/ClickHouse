@@ -90,6 +90,12 @@ struct BackupSettings
     /// Is it allowed to use blob paths to calculate checksums of backup entries?
     bool allow_checksums_from_remote_paths = true;
 
+    /// Maximum file size (in bytes) to embed directly in the backup XML metadata.
+    /// Files smaller than this threshold will be Base64-encoded and stored within the .backup file
+    /// instead of as separate files. This reduces file count for metadata-heavy backups.
+    /// Default: 8192 (8 KB). Set to 0 to disable embedding.
+    UInt64 max_small_file_size_for_backup = 8192;
+
     /// Internal, should not be specified by user.
     /// Whether this backup is a part of a distributed backup created by BACKUP ON CLUSTER.
     bool internal = false;

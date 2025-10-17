@@ -3,7 +3,9 @@
 #include <Backups/BackupFileInfo.h>
 #include <Backups/BackupIO.h>
 #include <Backups/IBackupEntry.h>
+#include <Backups/BackupEntryFromSmallFile.h>
 #include <Backups/BackupIO_S3.h>
+#include <Common/Base64.h>
 #include <Common/CurrentThread.h>
 #include <Common/ProfileEvents.h>
 #include <Common/StringUtils.h>
@@ -60,7 +62,8 @@ namespace
 {
     const int INITIAL_BACKUP_VERSION = 1;
     /// We may use lightweight backup in version 2.
-    const int CURRENT_BACKUP_VERSION = 2;
+    /// Version 3 adds support for embedding small file contents directly in XML metadata.
+    const int CURRENT_BACKUP_VERSION = 3;
 
     using SizeAndChecksum = IBackup::SizeAndChecksum;
 
@@ -420,6 +423,13 @@ void BackupImpl::writeBackupMetadata()
                 *out << "<encrypted_by_disk>true</encrypted_by_disk>";
         }
 
+        /// Write embedded file data if present (version 3+)
+        auto embedded_it = embedded_files.find(info.file_name);
+        if (embedded_it != embedded_files.end())
+        {
+            *out << "<embedded_data>" << embedded_it->second << "</embedded_data>";
+        }
+
         total_size += info.size;
         bool has_entry = !params.deduplicate_files || (info.size && (info.size != info.base_size) && (info.data_file_name.empty() || (info.data_file_name == info.file_name)));
         if (has_entry)
@@ -534,6 +544,13 @@ void BackupImpl::readBackupMetadata()
                     info.data_file_name = getString(file_config, "data_file", info.file_name);
                 }
                 info.encrypted_by_disk = getBool(file_config, "encrypted_by_disk", false);
+            }
+
+            /// Read embedded file data if present (version 3+)
+            if (version >= 3 && file_config->getNodeByPath("embedded_data"))
+            {
+                String encoded_data = getString(file_config, "embedded_data");
+                embedded_files[info.file_name] = encoded_data;
             }
 
             file_names.emplace(info.file_name, std::pair{info.size, info.checksum});
@@ -777,6 +794,19 @@ BackupImpl::readFileImpl(const String & file_name, const SizeAndChecksum & size_
         return std::make_unique<ReadBufferFromOutsideMemoryFile>(file_name, std::string_view{});
     }
 
+    /// Check if this file is embedded in the XML metadata (version 3+)
+    {
+        std::lock_guard lock{mutex};
+        auto embedded_it = embedded_files.find(removeLeadingSlash(file_name));
+        if (embedded_it != embedded_files.end())
+        {
+            String decoded_data = base64Decode(embedded_it->second);
+            ++num_read_files;
+            num_read_bytes += decoded_data.size();
+            return std::make_unique<ReadBufferFromOutsideMemoryFile>(file_name, std::move(decoded_data));
+        }
+    }
+
     BackupFileInfo info;
     {
         std::lock_guard lock{mutex};
@@ -987,6 +1017,26 @@ void BackupImpl::writeFile(const BackupFileInfo & info, BackupEntryPtr entry)
 
     if (writing_finalized)
         throw Exception(ErrorCodes::LOGICAL_ERROR, "Backup is already finalized");
+
+    /// Check if this is a small file entry that should be embedded in XML metadata
+    auto * small_file_entry = dynamic_cast<const BackupEntryFromSmallFile*>(entry.get());
+    if (small_file_entry && info.size > 0)
+    {
+        LOG_TRACE(log, "Embedding small file {} ({} bytes) in backup metadata", info.file_name, info.size);
+        auto read_buffer = small_file_entry->getReadBuffer(ReadSettings{});
+        String file_data;
+        readStringUntilEOF(file_data, *read_buffer);
+        String encoded_data = base64Encode(file_data);
+
+        std::lock_guard lock{mutex};
+        embedded_files[info.file_name] = std::move(encoded_data);
+        ++num_files;
+        total_size += info.size;
+        ++num_entries;
+        size_of_entries += info.size;
+        uncompressed_size += info.size;
+        return;
+    }
 
     {
         std::lock_guard lock{mutex};

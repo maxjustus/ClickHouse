@@ -478,6 +478,10 @@ When set to `true`, all threads executing S3 requests to the same backup endpoin
 after any single S3 request encounters a retryable S3 error, such as 'Slow Down'.
 When set to `false`, each thread handles s3 request backoff independently of the others.
 )", 0) \
+    DECLARE(UInt64, max_small_file_size_for_backup, 16384, R"(
+The maximum size of a file to be embedded directly into the backup's XML file.
+If a file's size is smaller or equal to this threshold, it will be embedded to reduce the number of files in the backup.
+)", 0) \
     DECLARE(UInt64, azure_list_object_keys_size, 1000, R"(
 Maximum number of files that could be returned in batch by ListObject request
 )", 0) \
