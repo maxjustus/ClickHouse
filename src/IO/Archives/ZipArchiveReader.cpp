@@ -4,6 +4,7 @@
 #include <IO/Archives/ZipArchiveWriter.h>
 #include <IO/ReadBufferFromFileBase.h>
 #include <Common/quoteString.h>
+#include <base/scope_guard.h>
 #include <base/errnoToString.h>
 
 #include <unzip.h>
@@ -82,10 +83,23 @@ public:
     bool locateFile(const String & file_name_)
     {
         resetFileInfo();
-        bool case_sensitive = true;
-        int err = unzLocateFile(raw_handle, file_name_.c_str(), reinterpret_cast<unzFileNameComparer>(static_cast<size_t>(case_sensitive)));
-        if (err == UNZ_END_OF_LIST_OF_FILE)
+
+        /// Build index on first use
+        auto reader_ptr = reader;
+        if (!reader_ptr->index_built.load(std::memory_order_acquire))
+            reader_ptr->buildIndex();
+
+        /// Look up file in index
+        auto it = reader_ptr->file_index.find(file_name_);
+        if (it == reader_ptr->file_index.end())
             return false;
+
+        /// Jump directly to file position
+        const auto & entry = reader_ptr->index_entries[it->second];
+        int err = unzGoToFilePos64(raw_handle, &entry.position);
+        if (err != UNZ_OK)
+            return false;
+
         file_name = file_name_;
         return true;
     }
@@ -113,11 +127,22 @@ public:
     bool tryLocateFile(const String & file_name_)
     {
         resetFileInfo();
-        bool case_sensitive = true;
-        int err = unzLocateFile(raw_handle, file_name_.c_str(), reinterpret_cast<unzFileNameComparer>(static_cast<size_t>(case_sensitive)));
-        if (err == UNZ_END_OF_LIST_OF_FILE)
+
+        /// Build index on first use
+        auto reader_ptr = reader;
+        if (!reader_ptr->index_built.load(std::memory_order_acquire))
+            reader_ptr->buildIndex();
+
+        /// Look up file in index
+        auto it = reader_ptr->file_index.find(file_name_);
+        if (it == reader_ptr->file_index.end())
             return false;
+
+        /// Jump directly to file position
+        const auto & entry = reader_ptr->index_entries[it->second];
+        int err = unzGoToFilePos64(raw_handle, &entry.position);
         checkResult(err);
+
         file_name = file_name_;
         return true;
     }
@@ -158,22 +183,19 @@ public:
 
     std::vector<std::string> getAllFiles(NameFilter filter)
     {
+        /// Build index on first use
+        auto reader_ptr = reader;
+        if (!reader_ptr->index_built.load(std::memory_order_acquire))
+            reader_ptr->buildIndex();
+
+        /// Use index to get all files without traversing archive
         std::vector<std::string> files;
-        resetFileInfo();
-        int err = unzGoToFirstFile(raw_handle);
-        if (err == UNZ_END_OF_LIST_OF_FILE)
-            return files;
-
-        do
+        files.reserve(reader_ptr->index_entries.size());
+        for (const auto & entry : reader_ptr->index_entries)
         {
-            checkResult(err);
-            resetFileInfo();
-            retrieveFileInfo();
-            if (!filter || filter(getFileName()))
-                files.push_back(*file_name);
-            err = unzGoToNextFile(raw_handle);
-        } while (err != UNZ_END_OF_LIST_OF_FILE);
-
+            if (!filter || filter(entry.filename))
+                files.push_back(entry.filename);
+        }
         return files;
     }
 
@@ -672,6 +694,62 @@ void ZipArchiveReader::checkResult(int code) const
 void ZipArchiveReader::showError(const String & message) const
 {
     throw Exception(ErrorCodes::CANNOT_UNPACK_ARCHIVE, "Couldn't unpack zip archive {}: {}", quoteString(path_to_archive), message);
+}
+
+void ZipArchiveReader::buildIndex()
+{
+    if (index_built.load(std::memory_order_acquire))
+        return;
+
+    std::call_once(index_once, [this] { buildIndexImpl(); });
+}
+
+void ZipArchiveReader::buildIndexImpl()
+{
+    RawHandle handle = acquireRawHandle();
+    SCOPE_EXIT({ releaseRawHandle(handle); });
+
+    std::vector<IndexEntry> entries;
+    std::unordered_map<std::string, size_t> lookup;
+
+    int err = unzGoToFirstFile(handle);
+    if (err == UNZ_END_OF_LIST_OF_FILE)
+    {
+        file_index.clear();
+        index_entries.clear();
+        index_built.store(true, std::memory_order_release);
+        return;
+    }
+    checkResult(err);
+
+    do
+    {
+        checkResult(err);
+
+        /// Get file info to extract filename
+        unz_file_info64 finfo;
+        err = unzGetCurrentFileInfo64(handle, &finfo, nullptr, 0, nullptr, 0, nullptr, 0);
+        checkResult(err);
+
+        /// Get filename
+        std::string filename;
+        filename.resize(finfo.size_filename);
+        checkResult(unzGetCurrentFileInfo64(handle, nullptr, filename.data(), finfo.size_filename, nullptr, 0, nullptr, 0));
+
+        /// Get file position
+        unz64_file_pos file_pos;
+        checkResult(unzGetFilePos64(handle, &file_pos));
+
+        entries.push_back(IndexEntry{std::move(filename), file_pos});
+        lookup.try_emplace(entries.back().filename, entries.size() - 1);
+
+        /// Move to next file
+        err = unzGoToNextFile(handle);
+    } while (err != UNZ_END_OF_LIST_OF_FILE);
+
+    file_index = std::move(lookup);
+    index_entries = std::move(entries);
+    index_built.store(true, std::memory_order_release);
 }
 
 }

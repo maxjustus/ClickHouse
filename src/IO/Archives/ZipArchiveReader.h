@@ -4,8 +4,12 @@
 
 #if USE_MINIZIP
 #include <IO/Archives/IArchiveReader.h>
+#include <atomic>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
+
+#include <unzip.h>
 
 
 namespace DB
@@ -81,6 +85,21 @@ private:
     String password;
     std::vector<RawHandle> free_handles;
     mutable std::mutex mutex;
+
+    struct IndexEntry
+    {
+        std::string filename;
+        unz64_file_pos position;
+    };
+
+    /// File index for fast lookups (maps filename to the first occurrence in archive order).
+    std::unordered_map<std::string, size_t> file_index;
+    std::vector<IndexEntry> index_entries;
+    std::atomic<bool> index_built{false};
+    std::once_flag index_once;
+
+    void buildIndex();
+    void buildIndexImpl();
 };
 
 }
