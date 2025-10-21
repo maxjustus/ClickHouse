@@ -1,5 +1,7 @@
 #include <Columns/ColumnString.h>
+#include <Columns/ColumnObject.h>
 #include <DataTypes/DataTypeString.h>
+#include <DataTypes/DataTypeObject.h>
 #include <Functions/FunctionFactory.h>
 #include <Functions/FunctionHelpers.h>
 #include <Functions/IFunction.h>
@@ -56,17 +58,223 @@ namespace
             if (arguments.empty())
                 throw Exception(ErrorCodes::TOO_FEW_ARGUMENTS_FOR_FUNCTION, "Function {} requires at least one argument.", getName());
 
+            /// Check if any argument is JSON type
+            bool has_json = false;
             for (const auto & arg : arguments)
-                if (!isString(arg.type))
-                    throw Exception(ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT, "Function {} requires string arguments", getName());
+            {
+                if (arg.type->getTypeId() == TypeIndex::Object)
+                    has_json = true;
+                else if (!isString(arg.type))
+                    throw Exception(ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT,
+                                   "Function {} requires String or JSON arguments", getName());
+            }
+
+            /// Return JSON type if any input is JSON, otherwise String
+            /// Use first JSON argument's type to preserve type parameters
+            if (has_json)
+            {
+                for (const auto & arg : arguments)
+                    if (arg.type->getTypeId() == TypeIndex::Object)
+                        return arg.type;
+            }
 
             return std::make_shared<DataTypeString>();
         }
 
-        ColumnPtr executeImpl(const ColumnsWithTypeAndName & arguments, const DataTypePtr &, size_t input_rows_count) const override
+        ColumnPtr executeImpl(const ColumnsWithTypeAndName & arguments, const DataTypePtr & result_type, size_t input_rows_count) const override
         {
             chassert(!arguments.empty());
 
+            /// Check if any argument is JSON type
+            bool has_json = false;
+            for (const auto & arg : arguments)
+            {
+                if (arg.type->getTypeId() == TypeIndex::Object)
+                {
+                    has_json = true;
+                    break;
+                }
+            }
+
+            /// All String → use RapidJSON path
+            if (!has_json)
+                return executeWithStrings(arguments, input_rows_count);
+
+            /// Has JSON or mixed → use Object-based merge with String parsing
+            return executeWithMixed(arguments, result_type, input_rows_count);
+        }
+
+    private:
+        /// Remove all child paths of parent_path from the object
+        /// Example: removeChildPaths(obj, "a") removes "a.b", "a.c", "a.b.c", etc.
+        static void removeChildPaths(Object & obj, const String & parent_path)
+        {
+            String prefix = parent_path + ".";
+            auto it = obj.lower_bound(prefix);
+            /// '/' is the next character after '.' in ASCII, giving us the range of all children of parent_path
+            /// For example: "a.b.c" and "a.b.c.d" are between "a.b" and "a.b/"
+            auto end = obj.lower_bound(parent_path + "/");
+            obj.erase(it, end);
+        }
+
+        /// Convert RapidJSON scalar value to Field
+        static Field rapidjsonScalarToField(const rapidjson::Value & value)
+        {
+            if (value.IsBool())
+                return Field(value.GetBool());
+            else if (value.IsInt64())
+                return Field(value.GetInt64());
+            else if (value.IsUint64())
+                return Field(value.GetUint64());
+            else if (value.IsDouble())
+                return Field(value.GetDouble());
+            else if (value.IsString())
+                return Field(String(value.GetString(), value.GetStringLength()));
+            else
+                throw Exception(ErrorCodes::BAD_ARGUMENTS, "Unsupported JSON value type");
+        }
+
+        /// Convert RapidJSON array to Field
+        static Field rapidjsonArrayToField(const rapidjson::Value & value)
+        {
+            Array result;
+            result.reserve(value.Size());
+
+            for (const auto & elem : value.GetArray())
+            {
+                if (elem.IsNull())
+                    result.push_back(Field(Null()));
+                else if (elem.IsObject())
+                {
+                    /// Recursively convert nested object to Object (flattened map)
+                    Object nested_obj;
+                    flattenJSONValue(nested_obj, "", elem);
+                    result.push_back(Field(nested_obj));
+                }
+                else if (elem.IsArray())
+                {
+                    /// Recursively convert nested array
+                    result.push_back(rapidjsonArrayToField(elem));
+                }
+                else
+                    result.push_back(rapidjsonScalarToField(elem));
+            }
+
+            return Field(result);
+        }
+
+        /// Recursively flatten JSON object into path -> value map
+        static void flattenJSONValue(Object & result, const String & path_prefix, const rapidjson::Value & value)
+        {
+            if (value.IsObject())
+            {
+                /// Recursively flatten nested objects
+                for (auto it = value.MemberBegin(); it != value.MemberEnd(); ++it)
+                {
+                    String new_path = path_prefix.empty()
+                        ? String(it->name.GetString(), it->name.GetStringLength())
+                        : path_prefix + "." + String(it->name.GetString(), it->name.GetStringLength());
+
+                    flattenJSONValue(result, new_path, it->value);
+                }
+            }
+            else if (value.IsNull())
+            {
+                /// Preserve null values - this allows us to delete paths from JSON objects during merge by passing json strings with nulls
+                result[path_prefix] = Field(Null());
+            }
+            else if (value.IsArray())
+            {
+                /// Store array as Field
+                result[path_prefix] = rapidjsonArrayToField(value);
+            }
+            else
+            {
+                /// Scalar value
+                result[path_prefix] = rapidjsonScalarToField(value);
+            }
+        }
+
+        /// Parse JSON string to flattened Object using RapidJSON
+        static Object parseJSONStringToObject(StringRef json_str)
+        {
+            rapidjson::Document doc;
+            doc.Parse(json_str.toString().c_str());
+
+            if (doc.HasParseError())
+                throw Exception(ErrorCodes::BAD_ARGUMENTS,
+                               "Wrong JSON string to merge: {}", rapidjson::GetParseError_En(doc.GetParseError()));
+
+            if (!doc.IsObject())
+                throw Exception(ErrorCodes::BAD_ARGUMENTS, "Wrong JSON string to merge. Expected JSON object");
+
+            Object result;
+            flattenJSONValue(result, "", doc);
+            return result;
+        }
+
+        /// Extract Object from argument - handles both String and JSON types
+        static Object extractObject(const ColumnWithTypeAndName & arg, size_t row)
+        {
+            if (arg.type->getTypeId() == TypeIndex::Object)
+            {
+                /// Extract from ColumnObject - null values are not stored
+                const auto & col_object = assert_cast<const ColumnObject &>(*arg.column);
+                return col_object[row].safeGet<Object>();
+            }
+            else
+            {
+                /// Parse String argument with RapidJSON - preserves null values
+                return parseJSONStringToObject(arg.column->getDataAt(row));
+            }
+        }
+
+        /// Merge logic for JSON type arguments or mixed String/JSON arguments
+        ColumnPtr executeWithMixed(
+            const ColumnsWithTypeAndName & arguments,
+            const DataTypePtr & result_type,
+            size_t input_rows_count) const
+        {
+            auto result_col = result_type->createColumn();
+            auto & result_object = assert_cast<ColumnObject &>(*result_col);
+
+            for (size_t row = 0; row < input_rows_count; ++row)
+            {
+                /// Start with first argument
+                Object merged = extractObject(arguments[0], row);
+
+                /// Merge each subsequent argument
+                for (size_t arg_idx = 1; arg_idx < arguments.size(); ++arg_idx)
+                {
+                    Object current = extractObject(arguments[arg_idx], row);
+
+                    for (auto & [path, value] : current)
+                    {
+                        if (value.isNull())
+                        {
+                            /// RFC 7386: null deletes path and all children
+                            merged.erase(path);
+                            removeChildPaths(merged, path);
+                        }
+                        else
+                        {
+                            /// Value replaces: delete children first, then set
+                            removeChildPaths(merged, path);
+                            merged[path] = value;
+                        }
+                    }
+                }
+
+                /// Insert merged object - ColumnObject handles typed/dynamic/shared logic
+                result_object.insert(Field(merged));
+            }
+
+            return result_col;
+        }
+
+        /// Merge logic for String type arguments (existing RapidJSON implementation)
+        ColumnPtr executeWithStrings(const ColumnsWithTypeAndName & arguments, size_t input_rows_count) const
+        {
             rapidjson::Document::AllocatorType allocator;
             std::function<void(rapidjson::Value &, const rapidjson::Value &)> merge_objects;
 
