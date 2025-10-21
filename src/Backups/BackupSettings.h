@@ -96,6 +96,12 @@ struct BackupSettings
     /// Default: 8192 (8 KB). Set to 0 to disable embedding.
     UInt64 max_small_file_size_for_backup = 8192;
 
+    /// Maximum size (in bytes) of remote backup archives to cache locally during restore.
+    /// Archives smaller than this threshold will be downloaded to tmp_path for significantly faster access
+    /// when restoring many files. This is especially beneficial for S3/Azure archives with thousands of files.
+    /// Default: 1 GB. Set to 0 to disable caching and stream directly from remote storage.
+    UInt64 cache_remote_archive_max_size = 1ULL * 1024 * 1024 * 1024;
+
     /// Internal, should not be specified by user.
     /// Whether this backup is a part of a distributed backup created by BACKUP ON CLUSTER.
     bool internal = false;

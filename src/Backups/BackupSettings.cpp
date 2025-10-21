@@ -41,6 +41,7 @@ namespace ErrorCodes
     M(Bool, write_access_entities_dependents) \
     M(Bool, allow_checksums_from_remote_paths) \
     M(UInt64, max_small_file_size_for_backup) \
+    M(UInt64, cache_remote_archive_max_size) \
     M(Bool, internal) \
     M(Bool, experimental_lightweight_snapshot) \
     M(String, host_id) \

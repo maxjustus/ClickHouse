@@ -97,6 +97,10 @@ private:
     void openArchive();
     void closeArchive(bool finalize);
 
+    /// Downloads a remote archive to local temp storage and returns the path.
+    /// Returns empty string if caching is disabled or conditions aren't met.
+    String downloadArchiveToTemp(const String & archive_name, size_t archive_size);
+
     /// Writes the file ".backup" containing backup's metadata.
     void writeBackupMetadata() TSA_REQUIRES(mutex);
     void readBackupMetadata() TSA_REQUIRES(mutex);
@@ -174,6 +178,10 @@ private:
     std::shared_ptr<IArchiveWriter> archive_writer;
     String lock_file_name;
     std::atomic<bool> lock_file_before_first_file_checked = false;
+
+    /// Local caching of remote archives for faster access
+    String cached_archive_path;
+    bool archive_is_cached = false;
 
     bool writing_finalized = false;
     bool corrupted = false;

@@ -25,8 +25,13 @@
 #include <IO/WriteHelpers.h>
 #include <IO/Operators.h>
 #include <IO/copyData.h>
+#include <IO/WriteBufferFromFile.h>
+#include <Interpreters/Context.h>
+#include <Core/UUID.h>
+#include <Disks/IVolume.h>
 #include <Poco/Util/XMLConfiguration.h>
 #include <Poco/DOM/DOMParser.h>
+#include <filesystem>
 
 
 namespace ProfileEvents
@@ -233,7 +238,22 @@ void BackupImpl::openArchive()
         if (!reader->fileExists(archive_name))
             throw Exception(ErrorCodes::BACKUP_NOT_FOUND, "Backup {} not found", backup_name_for_logging);
         size_t archive_size = reader->getFileSize(archive_name);
-        archive_reader = createArchiveReader(archive_name, [my_reader = reader, archive_name]{ return my_reader->readFile(archive_name); }, archive_size);
+
+        /// Try to download archive to local temp storage for faster access
+        cached_archive_path = downloadArchiveToTemp(archive_name, archive_size);
+
+        if (!cached_archive_path.empty())
+        {
+            /// Use cached local file
+            archive_reader = createArchiveReader(cached_archive_path);
+            archive_is_cached = true;
+        }
+        else
+        {
+            /// Stream directly from remote storage
+            archive_reader = createArchiveReader(archive_name, [my_reader = reader, archive_name]{ return my_reader->readFile(archive_name); }, archive_size);
+        }
+
         archive_reader->setPassword(archive_params.password);
     }
     else
@@ -241,6 +261,82 @@ void BackupImpl::openArchive()
         archive_writer = createArchiveWriter(archive_name, writer->writeFile(archive_name));
         archive_writer->setPassword(archive_params.password);
         archive_writer->setCompression(archive_params.compression_method, archive_params.compression_level);
+    }
+}
+
+String BackupImpl::downloadArchiveToTemp(const String & archive_name, size_t archive_size)
+{
+    /// Check if caching is enabled and size is within limit
+    if (params.cache_remote_archive_max_size == 0 || archive_size == 0 ||
+        archive_size > params.cache_remote_archive_max_size)
+        return "";
+
+    if (!params.context)
+    {
+        LOG_TRACE(log, "Skipping archive caching for {}: execution context is not available", archive_name);
+        return "";
+    }
+
+    auto volume = params.context->getGlobalTemporaryVolume();
+    if (!volume)
+    {
+        LOG_TRACE(log, "Skipping archive caching for {}: temporary volume is not configured", archive_name);
+        return "";
+    }
+
+    auto disk = volume->getDisk();
+    if (!disk)
+    {
+        LOG_TRACE(log, "Skipping archive caching for {}: temporary volume has no disk", archive_name);
+        return "";
+    }
+
+    /// Get tmp_path from disk
+    String tmp_path = disk->getPath();
+    if (tmp_path.empty())
+    {
+        LOG_TRACE(log, "Skipping archive caching for {}: temporary disk path is empty", archive_name);
+        return "";
+    }
+
+    /// Generate unique filename using an existing backup UUID if available, otherwise create a fresh one.
+    UUID uuid_for_cache = uuid ? *uuid : UUIDHelpers::generateV4();
+    String temp_filename = fmt::format("backup_archive_{}_{}.tmp", toString(uuid_for_cache), UUIDHelpers::generateV4());
+    String temp_path = std::filesystem::path(tmp_path) / temp_filename;
+    String final_path = temp_path.substr(0, temp_path.length() - 4); // Remove .tmp extension
+
+    try
+    {
+        LOG_INFO(log, "Downloading remote archive {} ({} bytes) to local cache: {}",
+                 archive_name, archive_size, final_path);
+
+        /// Read from remote storage
+        auto read_buffer = reader->readFile(archive_name);
+
+        /// Write to temp file
+        WriteBufferFromFile write_buffer(temp_path);
+        copyData(*read_buffer, write_buffer, archive_size);
+        write_buffer.finalize();
+
+        /// Atomic rename to final name
+        std::filesystem::rename(temp_path, final_path);
+
+        LOG_INFO(log, "Successfully cached remote archive to {}", final_path);
+        return final_path;
+    }
+    catch (...)
+    {
+        /// Clean up temp file on error
+        try
+        {
+            if (std::filesystem::exists(temp_path))
+                std::filesystem::remove(temp_path);
+        }
+        catch (...) {}
+
+        LOG_WARNING(log, "Failed to cache remote archive {}, will stream directly from remote storage: {}",
+                    archive_name, getCurrentExceptionMessage(false));
+        return "";
     }
 }
 
@@ -256,6 +352,26 @@ void BackupImpl::closeArchive(bool finalize)
 
     archive_reader.reset();
     archive_writer.reset();
+
+    /// Clean up cached archive file
+    if (archive_is_cached && !cached_archive_path.empty())
+    {
+        try
+        {
+            if (std::filesystem::exists(cached_archive_path))
+            {
+                std::filesystem::remove(cached_archive_path);
+                LOG_TRACE(log, "Removed cached archive file: {}", cached_archive_path);
+            }
+        }
+        catch (...)
+        {
+            LOG_WARNING(log, "Failed to remove cached archive file {}: {}",
+                        cached_archive_path, getCurrentExceptionMessage(false));
+        }
+        cached_archive_path.clear();
+        archive_is_cached = false;
+    }
 }
 
 std::shared_ptr<const IBackup> BackupImpl::getBaseBackup() const

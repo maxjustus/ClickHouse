@@ -44,6 +44,7 @@ public:
         bool use_same_s3_credentials_for_base_backup = false;
         bool use_same_password_for_base_backup = false;
         bool azure_attempt_to_create_container = true;
+        UInt64 cache_remote_archive_max_size = 1ULL * 1024 * 1024 * 1024;
         ReadSettings read_settings;
         WriteSettings write_settings;
 

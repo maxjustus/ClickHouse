@@ -589,6 +589,7 @@ BackupMutablePtr BackupsWorker::openBackupForWriting(const BackupInfo & backup_i
     backup_create_params.use_same_s3_credentials_for_base_backup = backup_settings.use_same_s3_credentials_for_base_backup;
     backup_create_params.use_same_password_for_base_backup = backup_settings.use_same_password_for_base_backup;
     backup_create_params.azure_attempt_to_create_container = backup_settings.azure_attempt_to_create_container;
+    backup_create_params.cache_remote_archive_max_size = backup_settings.cache_remote_archive_max_size;
     backup_create_params.read_settings = getReadSettingsForBackup(context, backup_settings);
     backup_create_params.write_settings = getWriteSettingsForBackup(context);
     auto backup = BackupFactory::instance().createBackup(backup_create_params);
