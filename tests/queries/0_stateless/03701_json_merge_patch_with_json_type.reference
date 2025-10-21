@@ -1,0 +1,51 @@
+=== All-String arguments ===
+{"a":1,"b":2}
+{"a":1,"b":2,"c":3}
+{"a":{"b":1,"c":2}}
+=== All-JSON type arguments ===
+{"a":1,"b":2}
+{"a":1,"b":2,"c":3}
+{"a":{"b":1,"c":2}}
+=== Mixed String/JSON arguments ===
+{"a":1,"b":2}
+{"a":1,"b":2}
+{"a":1,"b":2,"c":3}
+=== Null deletion with String arguments ===
+{"a":1,"b":null}
+{"a":null,"c":2}
+{"a":{"b":null}}
+=== Null deletion with mixed String/JSON ===
+{"a":1}
+{"c":2}
+{"1":2,"z":[1,2,3]}
+{"1":2}
+=== Child path removal ===
+{"a":{"e":3}}
+{"x":1}
+=== Nested arrays ===
+{"a":[1,2,3],"b":[4,5,6]}
+{"a":[1,2,3],"b":[4,5,6]}
+{"a":[3,4,5]}
+=== Arrays containing objects ===
+{"arr":[{"y":2}]}
+{"data":[{"nested":true}],"extra":"value"}
+=== Arrays containing arrays ===
+{"matrix":[[1,2],[3,4]],"vector":[5,6]}
+=== Complex nested structures ===
+{"a":{"b":{"c":1,"d":2}}}
+{"obj":{"arr":[{"deep":2}]}}
+=== Multiple merge operations ===
+{"a":1,"b":2,"c":3,"d":4}
+{"x":1,"z":3}
+=== Empty objects ===
+{"a":1}
+{"a":1}
+{}
+=== Value replacement ===
+{"a":2}
+{"a":"new"}
+{"x":{"b":3}}
+=== Type changes ===
+{"a":"string"}
+{"a":123}
+{"a":[1,2,3]}

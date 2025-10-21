@@ -187,7 +187,7 @@ namespace
         static Object parseJSONStringToObject(StringRef json_str)
         {
             rapidjson::Document doc;
-            doc.Parse(json_str.toString().c_str());
+            doc.Parse(json_str.data, json_str.size);
 
             if (doc.HasParseError())
                 throw Exception(ErrorCodes::BAD_ARGUMENTS,
@@ -199,6 +199,36 @@ namespace
             Object result;
             flattenJSONValue(result, "", doc);
             return result;
+        }
+
+        /// Remove parents of the provided path to avoid scalar/object conflicts
+        static void eraseParentPaths(Object & object, const String & path)
+        {
+            String prefix;
+            prefix.reserve(path.size());
+            for (const char c : path)
+            {
+                if (c == '.')
+                    object.erase(prefix);
+                prefix.push_back(c);
+            }
+        }
+
+        /// Remove the provided path and all its descendants from the flattened map
+        static void erasePathAndDescendants(Object & object, const String & path)
+        {
+            object.erase(path);
+
+            String prefix = path;
+            prefix.push_back('.');
+            auto it = object.lower_bound(prefix);
+            if (it == object.end())
+                return;
+
+            String upper_bound = path;
+            upper_bound.push_back('/');
+            auto end = object.lower_bound(upper_bound);
+            object.erase(it, end);
         }
 
         /// Extract Object from argument - handles both String and JSON types
@@ -235,65 +265,27 @@ namespace
                 for (size_t arg_idx = 1; arg_idx < arguments.size(); ++arg_idx)
                 {
                     Object current = extractObject(arguments[arg_idx], row);
+                    std::vector<std::pair<const String *, const Field *>> pending_inserts;
+                    pending_inserts.reserve(current.size());
 
-                    /// Phase 1: Collect what needs to be deleted and what to insert
-                    std::set<String> exact_deletions;  // Paths to delete exactly (parents of new values)
-                    std::set<String> subtree_deletions;  // Paths whose children should also be deleted
-                    Object values_to_insert;
-
-                    for (auto & [path, value] : current)
+                    for (const auto & [path, value] : current)
                     {
                         if (value.isNull())
                         {
                             /// RFC 7386: null deletes path and all children
-                            exact_deletions.insert(path);
-                            subtree_deletions.insert(path);
+                            erasePathAndDescendants(merged, path);
+                            continue;
                         }
-                        else
-                        {
-                            /// Value replaces: need to delete all parents and children
-                            subtree_deletions.insert(path);
 
-                            /// Mark all parent paths for deletion
-                            String prefix;
-                            prefix.reserve(path.size());
-                            for (size_t i = 0; i < path.size(); ++i)
-                            {
-                                if (path[i] == '.')
-                                    exact_deletions.insert(prefix);
-                                prefix.push_back(path[i]);
-                            }
-
-                            values_to_insert[path] = value;
-                        }
+                        /// Remove parent paths to avoid mixing scalars and objects
+                        eraseParentPaths(merged, path);
+                        /// Remove existing value and descendants before inserting replacement
+                        erasePathAndDescendants(merged, path);
+                        pending_inserts.emplace_back(&path, &value);
                     }
 
-                    /// Phase 2: Execute deletions using range-based operations
-                    /// First delete subtrees (path + all children)
-                    for (const auto & subtree_root : subtree_deletions)
-                    {
-                        /// Delete the path itself
-                        merged.erase(subtree_root);
-
-                        /// Delete all children using range erase
-                        String prefix = subtree_root + ".";
-                        auto it = merged.lower_bound(prefix);
-                        // Find all keys between "subtree_root." and the next key that doesn't start with that prefix
-                        auto end = merged.lower_bound(subtree_root + "/");
-                        merged.erase(it, end);
-                    }
-
-                    /// Then delete exact paths (parents that aren't already deleted)
-                    for (const auto & exact_path : exact_deletions)
-                    {
-                        merged.erase(exact_path);
-                    }
-
-                    /// Phase 3: Insert new values
-                    for (auto & [path, value] : values_to_insert)
-                    {
-                        merged[path] = std::move(value);
-                    }
+                    for (const auto & [path_ptr, value_ptr] : pending_inserts)
+                        merged.insert_or_assign(*path_ptr, *value_ptr);
                 }
 
                 /// Insert merged object - ColumnObject handles typed/dynamic/shared logic
