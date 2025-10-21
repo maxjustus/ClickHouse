@@ -105,18 +105,6 @@ namespace
         }
 
     private:
-        /// Remove all child paths of parent_path from the object
-        /// Example: removeChildPaths(obj, "a") removes "a.b", "a.c", "a.b.c", etc.
-        static void removeChildPaths(Object & obj, const String & parent_path)
-        {
-            String prefix = parent_path + ".";
-            auto it = obj.lower_bound(prefix);
-            /// '/' is the next character after '.' in ASCII, giving us the range of all children of parent_path
-            /// For example: "a.b.c" and "a.b.c.d" are between "a.b" and "a.b/"
-            auto end = obj.lower_bound(parent_path + "/");
-            obj.erase(it, end);
-        }
-
         /// Convert RapidJSON scalar value to Field
         static Field rapidjsonScalarToField(const rapidjson::Value & value)
         {
@@ -248,20 +236,63 @@ namespace
                 {
                     Object current = extractObject(arguments[arg_idx], row);
 
+                    /// Phase 1: Collect what needs to be deleted and what to insert
+                    std::set<String> exact_deletions;  // Paths to delete exactly (parents of new values)
+                    std::set<String> subtree_deletions;  // Paths whose children should also be deleted
+                    Object values_to_insert;
+
                     for (auto & [path, value] : current)
                     {
                         if (value.isNull())
                         {
                             /// RFC 7386: null deletes path and all children
-                            merged.erase(path);
-                            removeChildPaths(merged, path);
+                            exact_deletions.insert(path);
+                            subtree_deletions.insert(path);
                         }
                         else
                         {
-                            /// Value replaces: delete children first, then set
-                            removeChildPaths(merged, path);
-                            merged[path] = value;
+                            /// Value replaces: need to delete all parents and children
+                            subtree_deletions.insert(path);
+
+                            /// Mark all parent paths for deletion
+                            String prefix;
+                            prefix.reserve(path.size());
+                            for (size_t i = 0; i < path.size(); ++i)
+                            {
+                                if (path[i] == '.')
+                                    exact_deletions.insert(prefix);
+                                prefix.push_back(path[i]);
+                            }
+
+                            values_to_insert[path] = value;
                         }
+                    }
+
+                    /// Phase 2: Execute deletions using range-based operations
+                    /// First delete subtrees (path + all children)
+                    for (const auto & subtree_root : subtree_deletions)
+                    {
+                        /// Delete the path itself
+                        merged.erase(subtree_root);
+
+                        /// Delete all children using range erase
+                        String prefix = subtree_root + ".";
+                        auto it = merged.lower_bound(prefix);
+                        // Find all keys between "subtree_root." and the next key that doesn't start with that prefix
+                        auto end = merged.lower_bound(subtree_root + "/");
+                        merged.erase(it, end);
+                    }
+
+                    /// Then delete exact paths (parents that aren't already deleted)
+                    for (const auto & exact_path : exact_deletions)
+                    {
+                        merged.erase(exact_path);
+                    }
+
+                    /// Phase 3: Insert new values
+                    for (auto & [path, value] : values_to_insert)
+                    {
+                        merged[path] = std::move(value);
                     }
                 }
 
