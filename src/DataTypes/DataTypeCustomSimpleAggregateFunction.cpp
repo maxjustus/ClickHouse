@@ -43,6 +43,7 @@ void DataTypeCustomSimpleAggregateFunction::checkSupportedFunctions(const Aggreg
         "groupBitAnd",
         "groupBitOr",
         "groupBitXor",
+        "groupJSONMergePatch",
         "sumMap",
         "minMap",
         "maxMap",
