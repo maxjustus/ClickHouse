@@ -164,9 +164,21 @@ namespace JSONMergePatchHelpers
     {
         if (arg.type->getTypeId() == TypeIndex::Object)
         {
-            /// Extract from ColumnObject
+            /// Extract from ColumnObject and track explicit nulls stored in dynamic paths
             const auto & col_object = assert_cast<const ColumnObject &>(*arg.column);
-            return col_object[row].safeGet<Object>();
+            Object result = col_object[row].safeGet<Object>();
+
+            const auto & dynamic_paths_ptrs = col_object.getDynamicPathsPtrs();
+            for (const auto & [path, dynamic_column] : dynamic_paths_ptrs)
+            {
+                if (row >= dynamic_column->size())
+                    continue;
+
+                if (dynamic_column->isNullAt(row) && !result.contains(path))
+                    result[path] = Field(Null());
+            }
+
+            return result;
         }
         else
         {

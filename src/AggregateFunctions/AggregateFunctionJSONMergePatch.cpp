@@ -89,12 +89,9 @@ namespace
                     }
                     for (const auto & [path, dynamic_column] : dynamic_paths_ptrs)
                     {
-                        if (!dynamic_column->isNullAt(row_num))
-                        {
-                            dynamic_column->get(row_num, value);
-                            auto [it, inserted] = dest.emplace(std::piecewise_construct, std::forward_as_tuple(path), std::forward_as_tuple());
-                            it->second = std::move(value);
-                        }
+                        dynamic_column->get(row_num, value);
+                        auto [it, inserted] = dest.emplace(std::piecewise_construct, std::forward_as_tuple(path), std::forward_as_tuple());
+                        it->second = std::move(value);
                     }
                     if (row_num < shared_offsets.size())
                     {
@@ -123,8 +120,6 @@ namespace
                     }
                     for (const auto & [path, dynamic_column] : dynamic_paths_ptrs)
                     {
-                        if (dynamic_column->isNullAt(row_num))
-                            continue;
                         dynamic_column->get(row_num, value);
                         JSONMergePatchHelpers::applyPatchEntry(dest, path, std::move(value));
                     }
