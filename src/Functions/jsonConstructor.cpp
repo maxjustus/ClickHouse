@@ -49,12 +49,12 @@ public:
 
 private:
     /// Helper function to convert named tuples to Objects recursively
-    static Field convertTupleToObjectIfNeeded(const Field & value, const DataTypePtr & type)
+    static Field convertTupleToObjectIfNeeded(const Field & value, const IDataType * type)
     {
-        if (value.getType() != Field::Types::Tuple)
+        if (!type || value.getType() != Field::Types::Tuple)
             return value;
 
-        const auto * tuple_type = typeid_cast<const DataTypeTuple *>(type.get());
+        const auto * tuple_type = typeid_cast<const DataTypeTuple *>(type);
         if (!tuple_type || !tuple_type->hasExplicitNames())
             return value; // Unnamed tuple stays as array
 
@@ -66,7 +66,7 @@ private:
         for (size_t i = 0; i < tuple.size(); ++i)
         {
             // Recursively convert nested tuples
-            Field element_value = convertTupleToObjectIfNeeded(tuple[i], tuple_type->getElement(i));
+            Field element_value = convertTupleToObjectIfNeeded(tuple[i], tuple_type->getElement(i).get());
             nested_obj[names[i]] = std::move(element_value);
         }
 
@@ -126,17 +126,20 @@ public:
 
         struct KeyInfo
         {
-            ColumnPtr column;
             String constant_key;
             bool is_const = false;
         };
 
         std::vector<KeyInfo> keys(num_pairs);
         std::vector<const ColumnString *> key_columns(num_pairs, nullptr);
-        std::vector<ColumnPtr> value_columns;
-        std::vector<DataTypePtr> value_types;
+        std::vector<ColumnPtr> owned_key_columns; /// Own materialized key columns created from const/LC inputs.
+        owned_key_columns.reserve(num_pairs);
+        std::vector<const IColumn *> value_columns;
+        std::vector<const IDataType *> value_types;
+        std::vector<bool> needs_named_tuple_conversion;
         value_columns.reserve(num_pairs);
         value_types.reserve(num_pairs);
+        needs_named_tuple_conversion.reserve(num_pairs);
 
         for (size_t pair_index = 0, arg_index = 0; pair_index < num_pairs; ++pair_index, arg_index += 2)
         {
@@ -154,16 +157,24 @@ public:
             {
                 keys[pair_index].is_const = true;
                 keys[pair_index].constant_key = key_const->getValue<String>();
+                owned_key_columns.emplace_back();
             }
             else
             {
                 ColumnPtr key_column = key_argument.column;
+                ColumnPtr owned_key_column;
 
                 if (const auto * column_const = checkAndGetColumn<ColumnConst>(key_column.get()))
+                {
                     key_column = column_const->convertToFullColumn();
+                    owned_key_column = key_column;
+                }
 
                 if (const auto * low_cardinality = checkAndGetColumn<ColumnLowCardinality>(key_column.get()))
+                {
                     key_column = low_cardinality->convertToFullColumn();
+                    owned_key_column = key_column;
+                }
 
                 const auto * string_column = checkAndGetColumn<ColumnString>(key_column.get());
                 if (!string_column)
@@ -174,12 +185,23 @@ public:
                         arg_index,
                         key_column->getName());
 
-                keys[pair_index].column = key_column;
                 key_columns[pair_index] = string_column;
+                owned_key_columns.emplace_back(std::move(owned_key_column));
             }
 
-            value_columns.push_back(value_argument.column);
-            value_types.push_back(value_argument.type);
+            const IColumn * value_column = value_argument.column.get();
+            if (!value_column)
+                throw Exception(
+                    ErrorCodes::ILLEGAL_COLUMN, "Function {} received empty column for value argument {}", getName(), arg_index + 1);
+
+            const IDataType * value_type = value_argument.type.get();
+            bool convert_tuple = false;
+            if (const auto * tuple_type = typeid_cast<const DataTypeTuple *>(value_type))
+                convert_tuple = tuple_type->hasExplicitNames();
+
+            value_columns.push_back(value_column);
+            value_types.push_back(value_type);
+            needs_named_tuple_conversion.push_back(convert_tuple);
         }
 
         /// Build JSON objects for each row
@@ -191,7 +213,9 @@ public:
             {
                 Field value;
                 value_columns[pair_index]->get(row, value);
-                value = convertTupleToObjectIfNeeded(value, value_types[pair_index]);
+
+                if (needs_named_tuple_conversion[pair_index])
+                    value = convertTupleToObjectIfNeeded(value, value_types[pair_index]);
 
                 if (keys[pair_index].is_const)
                 {
