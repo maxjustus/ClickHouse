@@ -1,13 +1,18 @@
 #include <AggregateFunctions/AggregateFunctionFactory.h>
 #include <AggregateFunctions/FactoryHelpers.h>
 #include <AggregateFunctions/IAggregateFunction.h>
+#include <Columns/ColumnDynamic.h>
 #include <Columns/ColumnObject.h>
 #include <DataTypes/DataTypeObject.h>
 #include <Functions/JSONMergePatchHelpers.h>
+#include <DataTypes/Serializations/SerializationDynamic.h>
 #include <Common/FieldBinaryEncoding.h>
+#include <Formats/FormatSettings.h>
+#include <IO/ReadBufferFromMemory.h>
 #include <IO/ReadHelpers.h>
 #include <IO/WriteHelpers.h>
 #include <Common/assert_cast.h>
+#include <string_view>
 
 #if USE_RAPIDJSON
 
@@ -21,6 +26,18 @@ namespace ErrorCodes
 
 namespace
 {
+    const FormatSettings & getFormatSettingsForJSONMergePatch()
+    {
+        static thread_local const FormatSettings settings;
+        return settings;
+    }
+
+    const std::shared_ptr<SerializationDynamic> & getDynamicSerializationForJSONMergePatch()
+    {
+        static thread_local const std::shared_ptr<SerializationDynamic> serialization = std::make_shared<SerializationDynamic>();
+        return serialization;
+    }
+
     struct AggregateFunctionJSONMergePatchData
     {
         Object merged;
@@ -50,7 +67,85 @@ namespace
         {
             auto & data = this->data(place);
 
-            /// Extract Object from input (handles both String and JSON types)
+            if (input_type->getTypeId() == TypeIndex::Object)
+            {
+                const auto & column_object = assert_cast<const ColumnObject &>(*columns[0]);
+                const auto & typed_paths = column_object.getTypedPaths();
+                const auto & dynamic_paths_ptrs = column_object.getDynamicPathsPtrs();
+                const auto & shared_offsets = column_object.getSharedDataOffsets();
+                const auto [shared_paths, shared_values] = column_object.getSharedDataPathsAndValues();
+                auto & shared_serialization = getDynamicSerializationForJSONMergePatch();
+
+                if (!data.initialized)
+                {
+                    auto & dest = data.merged;
+                    dest.clear();
+                    Field value;
+                    for (const auto & [path, typed_column] : typed_paths)
+                    {
+                        typed_column->get(row_num, value);
+                        auto [it, inserted] = dest.emplace(std::piecewise_construct, std::forward_as_tuple(path), std::forward_as_tuple());
+                        it->second = std::move(value);
+                    }
+                    for (const auto & [path, dynamic_column] : dynamic_paths_ptrs)
+                    {
+                        if (!dynamic_column->isNullAt(row_num))
+                        {
+                            dynamic_column->get(row_num, value);
+                            auto [it, inserted] = dest.emplace(std::piecewise_construct, std::forward_as_tuple(path), std::forward_as_tuple());
+                            it->second = std::move(value);
+                        }
+                    }
+                    if (row_num < shared_offsets.size())
+                    {
+                        size_t start = row_num == 0 ? 0 : shared_offsets[row_num - 1];
+                        size_t end = shared_offsets[row_num];
+                        for (size_t i = start; i < end; ++i)
+                        {
+                            const auto path_ref = shared_paths->getDataAt(i);
+                            auto value_data = shared_values->getDataAt(i);
+                            ReadBufferFromMemory buf(value_data.data, value_data.size);
+                            shared_serialization->deserializeBinary(value, buf, getFormatSettingsForJSONMergePatch());
+                            auto [it, inserted] = dest.emplace(std::piecewise_construct, std::forward_as_tuple(path_ref.data, path_ref.size), std::forward_as_tuple());
+                            it->second = std::move(value);
+                        }
+                    }
+                    data.initialized = true;
+                }
+                else
+                {
+                    Field value;
+                    auto & dest = data.merged;
+                    for (const auto & [path, typed_column] : typed_paths)
+                    {
+                        typed_column->get(row_num, value);
+                        JSONMergePatchHelpers::applyPatchEntry(dest, path, std::move(value));
+                    }
+                    for (const auto & [path, dynamic_column] : dynamic_paths_ptrs)
+                    {
+                        if (dynamic_column->isNullAt(row_num))
+                            continue;
+                        dynamic_column->get(row_num, value);
+                        JSONMergePatchHelpers::applyPatchEntry(dest, path, std::move(value));
+                    }
+                    if (row_num < shared_offsets.size())
+                    {
+                        size_t start = row_num == 0 ? 0 : shared_offsets[row_num - 1];
+                        size_t end = shared_offsets[row_num];
+                        for (size_t i = start; i < end; ++i)
+                        {
+                            const auto path_ref = shared_paths->getDataAt(i);
+                            auto value_data = shared_values->getDataAt(i);
+                            ReadBufferFromMemory buf(value_data.data, value_data.size);
+                            shared_serialization->deserializeBinary(value, buf, getFormatSettingsForJSONMergePatch());
+                            JSONMergePatchHelpers::applyPatchEntry(dest, std::string_view(path_ref.data, path_ref.size), std::move(value));
+                        }
+                    }
+                }
+                return;
+            }
+
+            /// Extract Object from String input using RapidJSON
             Object current = JSONMergePatchHelpers::extractObject(ColumnWithTypeAndName{columns[0]->getPtr(), input_type, ""}, row_num);
 
             if (!data.initialized)

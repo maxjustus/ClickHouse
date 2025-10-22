@@ -16,6 +16,7 @@
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/error/en.h>
+#include <string_view>
 
 namespace DB
 {
@@ -128,7 +129,7 @@ namespace JSONMergePatchHelpers
     }
 
     /// Remove parents of the provided path to avoid scalar/object conflicts
-    static void eraseParentPaths(Object & object, const String & path)
+    static void eraseParentPaths(Object & object, std::string_view path)
     {
         String prefix;
         prefix.reserve(path.size());
@@ -141,17 +142,18 @@ namespace JSONMergePatchHelpers
     }
 
     /// Remove the provided path and all its descendants from the flattened map
-    static void erasePathAndDescendants(Object & object, const String & path)
+    static void erasePathAndDescendants(Object & object, std::string_view path)
     {
-        object.erase(path);
+        if (auto it = object.find(path); it != object.end())
+            object.erase(it);
 
-        String prefix = path;
+        String prefix(path);
         prefix.push_back('.');
         auto it = object.lower_bound(prefix);
         if (it == object.end())
             return;
 
-        String upper_bound = path;
+        String upper_bound(path);
         upper_bound.push_back('/');
         auto end = object.lower_bound(upper_bound);
         object.erase(it, end);
@@ -171,6 +173,23 @@ namespace JSONMergePatchHelpers
             /// Parse String argument with RapidJSON
             return parseJSONStringToObject(arg.column->getDataAt(row));
         }
+    }
+
+    void applyPatchEntry(Object & dest, std::string_view path, Field && value)
+    {
+        if (value.isNull())
+        {
+            erasePathAndDescendants(dest, path);
+            return;
+        }
+
+        eraseParentPaths(dest, path);
+        erasePathAndDescendants(dest, path);
+        auto [it, inserted] = dest.emplace(std::piecewise_construct, std::forward_as_tuple(path), std::forward_as_tuple());
+        if (!inserted)
+            it->second = std::move(value);
+        else
+            it->second = std::move(value);
     }
 
     /// Merge two objects according to RFC 7386 JSONMergePatch
