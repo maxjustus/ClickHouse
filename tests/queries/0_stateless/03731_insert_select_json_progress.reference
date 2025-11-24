@@ -1,0 +1,5 @@
+INSERT SELECT profile_events: OK
+INSERT SELECT progress: OK
+INSERT SELECT data inserted: OK
+CTAS profile_events: OK
+CTAS data inserted: OK

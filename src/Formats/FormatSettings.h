@@ -253,6 +253,8 @@ struct FormatSettings
         bool infer_array_of_dynamic_from_array_of_different_values = true;
         bool write_map_as_array_of_tuples = false;
         bool read_map_as_array_of_tuples = false;
+        bool include_logs = false;
+        bool include_profile_events = false;
         bool json_type_escape_dots_in_keys = false;
     } json{};
 
