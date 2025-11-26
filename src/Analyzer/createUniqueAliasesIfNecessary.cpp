@@ -1,5 +1,7 @@
 #include <Analyzer/createUniqueAliasesIfNecessary.h>
 
+#include <charconv>
+
 #include <Analyzer/ArrayJoinNode.h>
 #include <Analyzer/ColumnNode.h>
 #include <Analyzer/FunctionNode.h>
@@ -14,13 +16,46 @@ namespace DB
 namespace
 {
 
+/// Find the maximum numeric suffix among aliases matching the given prefix.
+/// For example, with prefix "__table", finds max N from aliases like "__table5", "__table12".
+class MaxAliasIdVisitor : public ConstInDepthQueryTreeVisitor<MaxAliasIdVisitor>
+{
+public:
+    explicit MaxAliasIdVisitor(std::string_view prefix_) : prefix(prefix_) {}
+
+    void visitImpl(const QueryTreeNodePtr & node)
+    {
+        if (!node->hasAlias())
+            return;
+
+        const auto & alias = node->getAlias();
+        if (!alias.starts_with(prefix))
+            return;
+
+        std::string_view suffix(alias);
+        suffix.remove_prefix(prefix.size());
+
+        size_t parsed = 0;
+        auto [ptr, ec] = std::from_chars(suffix.data(), suffix.data() + suffix.size(), parsed);
+        if (ec == std::errc{} && ptr == suffix.data() + suffix.size())
+            max_id = std::max(max_id, parsed);
+    }
+
+    size_t getMaxId() const { return max_id; }
+
+private:
+    std::string_view prefix;
+    size_t max_id = 0;
+};
+
 class CreateUniqueTableAliasesVisitor : public InDepthQueryTreeVisitorWithContext<CreateUniqueTableAliasesVisitor>
 {
 public:
     using Base = InDepthQueryTreeVisitorWithContext<CreateUniqueTableAliasesVisitor>;
 
-    explicit CreateUniqueTableAliasesVisitor(const ContextPtr & context)
+    explicit CreateUniqueTableAliasesVisitor(const ContextPtr & context, size_t start_id)
         : Base(context)
+        , next_id(start_id)
     {
         // Insert a fake node on top of the stack.
         scope_nodes_stack.push_back(std::make_shared<LambdaNode>(Names{}, nullptr, false));
@@ -50,6 +85,11 @@ public:
                 [[fallthrough]];
             case QueryTreeNodeType::TABLE_FUNCTION:
             {
+                /// If this table already has a synthetic alias from a previous run,
+                /// keep it so repeated traversals (e.g. during shard planning) stay stable.
+                if (node->hasAlias() && node->getAlias().starts_with("__table"))
+                    break;
+
                 auto & alias = table_expression_to_alias[node];
                 if (alias.empty())
                 {
@@ -118,7 +158,10 @@ public:
                 auto arg = function_node->getArguments().getNodes().back();
                 /// Avoid aliasing IN `table`
                 if (arg->getNodeType() != QueryTreeNodeType::TABLE)
-                    CreateUniqueTableAliasesVisitor(getContext()).visit(function_node->getArguments().getNodes().back());
+                {
+                    /// For the recursive call, we continue from current next_id to avoid collisions
+                    CreateUniqueTableAliasesVisitor(getContext(), next_id).visit(function_node->getArguments().getNodes().back());
+                }
             }
         }
     }
@@ -139,7 +182,12 @@ class CreateUniqueArrayJoinAliasesVisitor : public InDepthQueryTreeVisitorWithCo
 {
 public:
     using Base = InDepthQueryTreeVisitorWithContext<CreateUniqueArrayJoinAliasesVisitor>;
-    using Base::Base;
+
+    explicit CreateUniqueArrayJoinAliasesVisitor(const ContextPtr & context, size_t start_id)
+        : Base(context)
+        , next_id(start_id)
+    {
+    }
 
     void enterImpl(QueryTreeNodePtr & node)
     {
@@ -216,16 +264,26 @@ private:
 
 void createUniqueAliasesIfNecessary(QueryTreeNodePtr & node, const ContextPtr & context)
 {
+    /// Find max existing alias IDs to avoid collisions.
+    /// This handles: repeat traversals, user-provided __table* aliases, cloned trees.
+    MaxAliasIdVisitor table_max_visitor("__table");
+    table_max_visitor.visit(node);
+    size_t table_start_id = table_max_visitor.getMaxId();
+
+    MaxAliasIdVisitor array_join_max_visitor("__array_join_exp_");
+    array_join_max_visitor.visit(node);
+    size_t array_join_start_id = array_join_max_visitor.getMaxId();
+
     /*
      * For each table expression in the Query Tree generate and add a unique alias.
      * If table expression had an alias in initial query tree, override it.
      */
-    CreateUniqueTableAliasesVisitor(context).visit(node);
+    CreateUniqueTableAliasesVisitor(context, table_start_id).visit(node);
 
     /* Generate unique aliases for array join expressions.
      * It's required to create a valid AST for distributed query.
      */
-    CreateUniqueArrayJoinAliasesVisitor(context).visit(node);
+    CreateUniqueArrayJoinAliasesVisitor(context, array_join_start_id).visit(node);
 }
 
 }

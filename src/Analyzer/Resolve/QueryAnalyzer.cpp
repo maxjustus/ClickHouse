@@ -965,6 +965,34 @@ std::string QueryAnalyzer::rewriteAggregateFunctionNameIfNeeded(
 
 /// Resolve identifier functions implementation
 
+/** Check if a node contains expressions that cannot be safely cached.
+  * IN functions have PreparedSets tied to node identity and cannot be cloned.
+  */
+static bool nodeContainsUncacheableExpression(const QueryTreeNodePtr & node)
+{
+    if (!node)
+        return false;
+
+    auto node_type = node->getNodeType();
+
+    /// Subqueries need unique table aliases assigned by createUniqueAliasesIfNecessary
+    if (node_type == QueryTreeNodeType::QUERY || node_type == QueryTreeNodeType::UNION)
+        return true;
+
+    if (node->getNodeType() == QueryTreeNodeType::FUNCTION)
+    {
+        if (const auto * function_node = node->as<FunctionNode>())
+            if (isNameOfInFunction(function_node->getFunctionName()))
+                return true;
+    }
+
+    for (const auto & child : node->getChildren())
+        if (nodeContainsUncacheableExpression(child))
+            return true;
+
+    return false;
+}
+
 /** Resolve identifier from scope aliases.
   *
   * Resolve strategy:
@@ -1031,6 +1059,7 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifierFromAliases(const Ide
 
 
     auto node_type = alias_node->getNodeType();
+
     if (!identifier_lookup.isTableExpressionLookup())
     {
         alias_node = alias_node->clone();
@@ -1407,7 +1436,8 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     if (it->second.count == 0)
     {
         scope.identifier_in_lookup_process.erase(it);
-        if (can_use_cache && resolve_result.resolved_identifier)
+        if (can_use_cache && resolve_result.resolved_identifier
+            && !nodeContainsUncacheableExpression(resolve_result.resolved_identifier))
         {
             scope.identifier_to_resolved_expression_cache.insert(identifier_lookup, resolve_result);
         }
@@ -4850,8 +4880,8 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
     scope.aliases.alias_name_to_table_expression_node = std::move(transitive_aliases);
 
     resolveQueryJoinTreeNode(query_node_typed.getJoinTree(), scope, visitor);
-    if (!scope.group_by_use_nulls)
-        scope.identifier_to_resolved_expression_cache.enable();
+
+    scope.identifier_to_resolved_expression_cache.enable();
 
     /// Resolve query node sections.
 
@@ -4866,8 +4896,11 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
                 scope.scope_node->formatASTForErrorMessage());
     }
 
+
     if (auto & prewhere_node = query_node_typed.getPrewhere())
     {
+        scope.identifier_to_resolved_expression_cache.clear();
+
         bool allow_resolve_from_using = scope.allow_resolve_from_using;
         scope.allow_resolve_from_using = false;
         resolveExpressionNode(prewhere_node, scope, false /*allow_lambda_expression*/, false /*allow_table_expression*/);
@@ -4954,6 +4987,8 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     if (scope.group_by_use_nulls)
     {
+        scope.identifier_to_resolved_expression_cache.clear();
+
         projection_columns = resolveProjectionExpressionNodeList(query_node_typed.getProjectionNode(), scope);
         if (query_node_typed.getProjection().getNodes().empty())
             throw Exception(ErrorCodes::EMPTY_LIST_OF_COLUMNS_QUERIED,
