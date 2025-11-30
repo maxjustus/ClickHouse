@@ -4881,7 +4881,8 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     resolveQueryJoinTreeNode(query_node_typed.getJoinTree(), scope, visitor);
 
-    scope.identifier_to_resolved_expression_cache.enable();
+     if (!scope.group_by_use_nulls)
+         scope.identifier_to_resolved_expression_cache.enable();
 
     /// Resolve query node sections.
 
@@ -4924,11 +4925,6 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     if (query_node_typed.hasGroupBy())
         resolveGroupByNode(query_node_typed, scope);
-
-    if (scope.group_by_use_nulls)
-    {
-        resolved_expressions.clear();
-    }
 
     if (query_node_typed.hasHaving())
         resolveExpressionNode(query_node_typed.getHaving(), scope, false /*allow_lambda_expression*/, false /*allow_table_expression*/);
@@ -4987,8 +4983,6 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     if (scope.group_by_use_nulls)
     {
-        scope.identifier_to_resolved_expression_cache.clear();
-
         projection_columns = resolveProjectionExpressionNodeList(query_node_typed.getProjectionNode(), scope);
         if (query_node_typed.getProjection().getNodes().empty())
             throw Exception(ErrorCodes::EMPTY_LIST_OF_COLUMNS_QUERIED,
