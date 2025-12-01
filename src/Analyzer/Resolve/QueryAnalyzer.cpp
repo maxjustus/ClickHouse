@@ -968,7 +968,7 @@ std::string QueryAnalyzer::rewriteAggregateFunctionNameIfNeeded(
 /** Check if a node contains expressions that cannot be safely cached.
   * IN functions have PreparedSets tied to node identity and cannot be cloned.
   */
-static bool nodeContainsUncacheableExpression(const QueryTreeNodePtr & node)
+static bool nodeRequiresCloneFromCache(const QueryTreeNodePtr & node)
 {
     if (!node)
         return false;
@@ -979,15 +979,8 @@ static bool nodeContainsUncacheableExpression(const QueryTreeNodePtr & node)
     if (node_type == QueryTreeNodeType::QUERY || node_type == QueryTreeNodeType::UNION)
         return true;
 
-    if (node->getNodeType() == QueryTreeNodeType::FUNCTION)
-    {
-        if (const auto * function_node = node->as<FunctionNode>())
-            if (isNameOfInFunction(function_node->getFunctionName()))
-                return true;
-    }
-
     for (const auto & child : node->getChildren())
-        if (nodeContainsUncacheableExpression(child))
+        if (nodeRequiresCloneFromCache(child))
             return true;
 
     return false;
@@ -1322,7 +1315,24 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
         {
             const auto * cached_result = scope.identifier_to_resolved_expression_cache.find(identifier_lookup);
             if (cached_result)
-                return *cached_result;
+            {
+                // aggregate functions can be rewritten in ways which require multiple instances
+                // requires_clone_from_cache is precomputed at insert time to avoid repeated tree traversal
+                if (scope.expressions_in_resolve_process_stack.hasAggregateFunction()
+                    || cached_result->requires_clone_from_cache)
+                {
+                    // cloning is obviously not as fast as returning the same pointer, but still faster
+                    // than re-resolving from scratch
+                    return IdentifierResolveResult
+                    {
+                        .resolved_identifier = cached_result->resolved_identifier->clone(),
+                        .resolve_place = cached_result->resolve_place,
+                        .requires_clone_from_cache = cached_result->requires_clone_from_cache
+                    };
+                }
+                else
+                    return *cached_result;
+            }
         }
 
         auto [insert_it, _] = scope.identifier_in_lookup_process.insert({identifier_lookup, IdentifierResolveState()});
@@ -1436,9 +1446,9 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     if (it->second.count == 0)
     {
         scope.identifier_in_lookup_process.erase(it);
-        if (can_use_cache && resolve_result.resolved_identifier
-            && !nodeContainsUncacheableExpression(resolve_result.resolved_identifier))
+        if (can_use_cache && resolve_result.resolved_identifier)
         {
+            resolve_result.requires_clone_from_cache = nodeRequiresCloneFromCache(resolve_result.resolved_identifier);
             scope.identifier_to_resolved_expression_cache.insert(identifier_lookup, resolve_result);
         }
     }
