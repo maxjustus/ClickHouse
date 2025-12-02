@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Common/HashTable/HashMap.h>
 #include <Analyzer/IQueryTreeNode.h>
 
 namespace DB
@@ -39,7 +40,7 @@ void assertNoFunctionNodes(const QueryTreeNodePtr & node,
   */
 void validateTreeSize(const QueryTreeNodePtr & node,
     size_t max_size,
-    std::unordered_map<QueryTreeNodePtr, size_t> & node_to_tree_size);
+    HashMap<const IQueryTreeNode *, size_t> & node_to_tree_size);
 
 /**
   * Validate that correlated subqueries do not present in the context of distributed query.

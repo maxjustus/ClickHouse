@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <Analyzer/TableNode.h>
+#include <Common/HashTable/HashMap.h>
 #include <Interpreters/Context_fwd.h>
 #include <Analyzer/HashUtils.h>
 #include <Analyzer/IQueryTreeNode.h>
@@ -323,7 +324,7 @@ private:
     std::unordered_map<QueryTreeNodePtr, ProjectionNames> resolved_expressions;
 
     /// Global resolve expression node to tree size
-    std::unordered_map<QueryTreeNodePtr, size_t> node_to_tree_size;
+    HashMap<const IQueryTreeNode *, size_t> node_to_tree_size;
 
     /// Global scalar subquery to scalar value map
     std::unordered_map<QueryTreeNodePtrWithHash, Block> scalar_subquery_to_scalar_value_local;

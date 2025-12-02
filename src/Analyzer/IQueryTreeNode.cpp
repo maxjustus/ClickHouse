@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+#include <Common/HashTable/HashMap.h>
 #include <Common/SipHash.h>
 
 #include <IO/WriteBuffer.h>
@@ -179,7 +180,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
       */
     HashState hash_state;
 
-    std::unordered_map<const IQueryTreeNode *, size_t> weak_node_to_identifier;
+    HashMap<const IQueryTreeNode *, size_t> weak_node_to_identifier;
 
     std::vector<std::pair<const IQueryTreeNode *, bool>> nodes_to_process;
     nodes_to_process.emplace_back(this, false);
@@ -191,14 +192,18 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
 
         if (is_weak_node)
         {
-            auto node_identifier_it = weak_node_to_identifier.find(node_to_process);
-            if (node_identifier_it != weak_node_to_identifier.end())
+            if (auto * node_identifier_it = weak_node_to_identifier.find(node_to_process))
             {
-                hash_state.update(node_identifier_it->second);
+                hash_state.update(node_identifier_it->getMapped());
                 continue;
             }
 
-            weak_node_to_identifier.emplace(node_to_process, weak_node_to_identifier.size());
+            size_t new_identifier = weak_node_to_identifier.size();
+            decltype(weak_node_to_identifier)::LookupResult it;
+            bool inserted;
+            weak_node_to_identifier.emplace(node_to_process, it, inserted);
+            if (inserted)
+                it->getMapped() = new_identifier;
         }
 
         hash_state.update(static_cast<size_t>(node_to_process->getNodeType()));
@@ -250,7 +255,8 @@ QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const ReplacementMap & replacem
       *
       * After that we can update pointer in weak pointers array using old pointer to new pointer mapping.
       */
-    std::unordered_map<const IQueryTreeNode *, QueryTreeNodePtr> old_pointer_to_new_pointer;
+    HashMap<const IQueryTreeNode *, QueryTreeNodePtr> old_pointer_to_new_pointer;
+
     std::vector<QueryTreeNodeWeakPtr *> weak_pointers_to_update_after_clone;
 
     QueryTreeNodePtr result_cloned_node_place;
@@ -263,20 +269,28 @@ QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const ReplacementMap & replacem
         const auto [node_to_clone, place_for_cloned_node] = nodes_to_clone.back();
         nodes_to_clone.pop_back();
 
-        auto already_cloned_node_it = old_pointer_to_new_pointer.find(node_to_clone);
-        if (already_cloned_node_it != old_pointer_to_new_pointer.end())
+        if (auto * already_cloned = old_pointer_to_new_pointer.find(node_to_clone))
         {
-            *place_for_cloned_node = already_cloned_node_it->second;
+            *place_for_cloned_node = already_cloned->getMapped();
             continue;
         }
 
-        auto it = replacement_map.find(node_to_clone);
-        auto node_clone = it != replacement_map.end() ? it->second : node_to_clone->cloneImpl();
+        auto replacement_it = replacement_map.find(node_to_clone);
+        auto node_clone = replacement_it != replacement_map.end()
+            ? replacement_it->second
+            : node_to_clone->cloneImpl();
+
         *place_for_cloned_node = node_clone;
 
-        old_pointer_to_new_pointer.emplace(node_to_clone, node_clone);
+        {
+            decltype(old_pointer_to_new_pointer)::LookupResult lookup_it;
+            bool inserted;
+            old_pointer_to_new_pointer.emplace(node_to_clone, lookup_it, inserted);
+            if (inserted)
+                new (&lookup_it->getMapped()) QueryTreeNodePtr(node_clone);
+        }
 
-        if (it != replacement_map.end())
+        if (replacement_it != replacement_map.end())
             continue;
 
         node_clone->original_ast = node_to_clone->original_ast;
@@ -315,7 +329,7 @@ QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const ReplacementMap & replacem
     {
         assert(weak_pointer_ptr);
         auto strong_pointer = weak_pointer_ptr->lock();
-        auto it = old_pointer_to_new_pointer.find(strong_pointer.get());
+        auto * it = old_pointer_to_new_pointer.find(strong_pointer.get());
 
         /** If node had weak pointer to some other node and this node is not part of cloned subtree do not update weak pointer.
           * It will continue to point to previous location and it is expected.
@@ -324,10 +338,10 @@ QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const ReplacementMap & replacem
           * During analysis `id` is resolved as column node and `test_table` is column source.
           * If we clone `id` column, result column node weak source pointer will point to the same `test_table` column source.
           */
-        if (it == old_pointer_to_new_pointer.end())
+        if (!it)
             continue;
 
-        *weak_pointer_ptr = it->second;
+        *weak_pointer_ptr = it->getMapped();
     }
     result_cloned_node_place->original_ast = original_ast;
 

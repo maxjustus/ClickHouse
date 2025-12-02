@@ -432,11 +432,11 @@ void assertNoFunctionNodes(const QueryTreeNodePtr & node,
 
 void validateTreeSize(const QueryTreeNodePtr & node,
     size_t max_size,
-    std::unordered_map<QueryTreeNodePtr, size_t> & node_to_tree_size)
+    HashMap<const IQueryTreeNode *, size_t> & node_to_tree_size)
 {
     size_t tree_size = 0;
-    std::vector<std::pair<QueryTreeNodePtr, bool>> nodes_to_process;
-    nodes_to_process.emplace_back(node, false);
+    std::vector<std::pair<const IQueryTreeNode *, bool>> nodes_to_process;
+    nodes_to_process.emplace_back(node.get(), false);
 
     while (!nodes_to_process.empty())
     {
@@ -448,42 +448,45 @@ void validateTreeSize(const QueryTreeNodePtr & node,
             ++tree_size;
 
             size_t subtree_size = 1;
-            for (const auto & node_to_process_child : node_to_process->getChildren())
+            for (const auto & child : node_to_process->getChildren())
             {
-                if (!node_to_process_child)
+                if (!child)
                     continue;
 
-                subtree_size += node_to_tree_size[node_to_process_child];
+                if (auto * it = node_to_tree_size.find(child.get()))
+                    subtree_size += it->getMapped();
             }
 
             auto * constant_node = node_to_process->as<ConstantNode>();
             if (constant_node && constant_node->hasSourceExpression())
-                subtree_size += node_to_tree_size[constant_node->getSourceExpression()];
+            {
+                if (auto * it = node_to_tree_size.find(constant_node->getSourceExpression().get()))
+                    subtree_size += it->getMapped();
+            }
 
-            node_to_tree_size.emplace(node_to_process, subtree_size);
+            node_to_tree_size[node_to_process] = subtree_size;
             continue;
         }
 
-        auto node_to_size_it = node_to_tree_size.find(node_to_process);
-        if (node_to_size_it != node_to_tree_size.end())
+        if (auto * it = node_to_tree_size.find(node_to_process))
         {
-            tree_size += node_to_size_it->second;
+            tree_size += it->getMapped();
             continue;
         }
 
         nodes_to_process.emplace_back(node_to_process, true);
 
-        for (const auto & node_to_process_child : node_to_process->getChildren())
+        for (const auto & child : node_to_process->getChildren())
         {
-            if (!node_to_process_child)
+            if (!child)
                 continue;
 
-            nodes_to_process.emplace_back(node_to_process_child, false);
+            nodes_to_process.emplace_back(child.get(), false);
         }
 
         auto * constant_node = node_to_process->as<ConstantNode>();
         if (constant_node && constant_node->hasSourceExpression())
-            nodes_to_process.emplace_back(constant_node->getSourceExpression(), false);
+            nodes_to_process.emplace_back(constant_node->getSourceExpression().get(), false);
     }
 
     if (tree_size > max_size)
