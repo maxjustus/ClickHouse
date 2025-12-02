@@ -1316,22 +1316,20 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
             const auto * cached_result = scope.identifier_to_resolved_expression_cache.find(identifier_lookup);
             if (cached_result)
             {
-                // aggregate functions can be rewritten in ways which require multiple instances
-                // requires_clone_from_cache is precomputed at insert time to avoid repeated tree traversal
                 if (scope.expressions_in_resolve_process_stack.hasAggregateFunction()
                     || cached_result->requires_clone_from_cache)
                 {
-                    // cloning is obviously not as fast as returning the same pointer, but still faster
-                    // than re-resolving from scratch
-                    return IdentifierResolveResult
+                    if (auto cloned = cached_result->resolved_identifier->cloneTableExpressions())
                     {
-                        .resolved_identifier = cached_result->resolved_identifier->clone(),
-                        .resolve_place = cached_result->resolve_place,
-                        .requires_clone_from_cache = cached_result->requires_clone_from_cache
-                    };
+                        return IdentifierResolveResult
+                        {
+                            .resolved_identifier = cloned,
+                            .resolve_place = cached_result->resolve_place,
+                            .requires_clone_from_cache = cached_result->requires_clone_from_cache
+                        };
+                    }
                 }
-                else
-                    return *cached_result;
+                return *cached_result;
             }
         }
 

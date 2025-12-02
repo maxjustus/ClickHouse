@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <deque>
 
@@ -142,6 +143,13 @@ public:
 
     /// Get a deep copy of the query tree
     QueryTreeNodePtr clone() const;
+
+    /** Shallow clone that only copies nodes mutated by createUniqueAliasesIfNecessary
+      * and nodes needed for rewrite_in_to_join transformation.
+      * Clones: QUERY, UNION, TABLE, TABLE_FUNCTION, COLUMN, and IN function nodes.
+      * Returns nullptr if no cloning was needed.
+      */
+    QueryTreeNodePtr cloneTableExpressions() const;
 
     /** Get a deep copy of the query tree.
       * If node to clone is key in replacement map, then instead of clone it
@@ -300,6 +308,10 @@ private:
     /// but we need to keep the original one to support additional_table_filters.
     String original_alias;
     ASTPtr original_ast;
+
+    QueryTreeNodePtr cloneTableExpressionsImpl(
+        ReplacementMap & old_to_new,
+        std::vector<QueryTreeNodeWeakPtr *> & weak_pointers_to_update) const;
 };
 
 }

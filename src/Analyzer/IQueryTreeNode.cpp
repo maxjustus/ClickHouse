@@ -1,8 +1,9 @@
 #include <Analyzer/IQueryTreeNode.h>
 
-#include <unordered_map>
-
 #include <Common/SipHash.h>
+
+#include <Analyzer/FunctionNode.h>
+#include <Analyzer/Utils.h>
 
 #include <IO/WriteBuffer.h>
 #include <IO/WriteHelpers.h>
@@ -331,6 +332,75 @@ QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const QueryTreeNodePtr & node_t
     replacement_map.emplace(node_to_replace.get(), std::move(replacement_node));
 
     return cloneAndReplace(replacement_map);
+}
+
+QueryTreeNodePtr IQueryTreeNode::cloneTableExpressionsImpl(
+    ReplacementMap & old_to_new,
+    std::vector<QueryTreeNodeWeakPtr *> & weak_pointers_to_update) const
+{
+    bool needs_clone = false;
+    switch (getNodeType())
+    {
+        case QueryTreeNodeType::QUERY:
+        case QueryTreeNodeType::UNION:
+        case QueryTreeNodeType::TABLE:
+        case QueryTreeNodeType::TABLE_FUNCTION:
+        case QueryTreeNodeType::COLUMN:
+            needs_clone = true;
+            break;
+        default:
+            break;
+    }
+
+    QueryTreeNodes cloned_children = children;
+    bool any_child_cloned = false;
+    for (auto & child : cloned_children)
+    {
+        if (!child)
+            continue;
+        if (auto cloned = child->cloneTableExpressionsImpl(old_to_new, weak_pointers_to_update))
+        {
+            child = cloned;
+            any_child_cloned = true;
+        }
+    }
+
+    if (!needs_clone && !any_child_cloned)
+        return nullptr;
+
+    QueryTreeNodePtr result = cloneImpl();
+    result->original_ast = original_ast;
+    result->setAlias(alias);
+    result->children = std::move(cloned_children);
+    result->weak_pointers = weak_pointers;
+
+    old_to_new[this] = result;
+
+    for (auto & wp : result->weak_pointers)
+        weak_pointers_to_update.push_back(&wp);
+
+    return result;
+}
+
+QueryTreeNodePtr IQueryTreeNode::cloneTableExpressions() const
+{
+    ReplacementMap old_to_new;
+    std::vector<QueryTreeNodeWeakPtr *> weak_pointers_to_update;
+
+    auto result = cloneTableExpressionsImpl(old_to_new, weak_pointers_to_update);
+
+    /// Update weak pointers to point to new nodes if they were cloned
+    for (auto * weak_ptr : weak_pointers_to_update)
+    {
+        auto strong = weak_ptr->lock();
+        if (!strong)
+            continue;
+        auto it = old_to_new.find(strong.get());
+        if (it != old_to_new.end())
+            *weak_ptr = it->second;
+    }
+
+    return result;
 }
 
 ASTPtr IQueryTreeNode::toAST(const ConvertToASTOptions & options) const
