@@ -75,7 +75,7 @@ namespace
 /** This visitor checks if Query Tree structure is valid after each pass
   * in debug build.
   */
-class ValidationChecker : public InDepthQueryTreeVisitor<ValidationChecker>
+class ValidationChecker : public InDepthQueryTreeVisitor<ValidationChecker, false /*const_visitor*/, true /*memoize_by_pointer*/>
 {
 public:
     explicit ValidationChecker(String pass_name_)

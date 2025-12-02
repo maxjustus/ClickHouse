@@ -23,10 +23,10 @@ namespace Setting
 namespace
 {
 
-class SumIfToCountIfVisitor : public InDepthQueryTreeVisitorWithContext<SumIfToCountIfVisitor>
+class SumIfToCountIfVisitor : public InDepthQueryTreeVisitorWithContext<SumIfToCountIfVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<SumIfToCountIfVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<SumIfToCountIfVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

@@ -15,7 +15,7 @@ namespace ErrorCodes
     extern const int LOGICAL_ERROR;
 }
 
-class GeneralizeGroupingFunctionForDistributedVisitor : public InDepthQueryTreeVisitor<GeneralizeGroupingFunctionForDistributedVisitor>
+class GeneralizeGroupingFunctionForDistributedVisitor : public InDepthQueryTreeVisitor<GeneralizeGroupingFunctionForDistributedVisitor, /*const_visitor=*/ false, /*memoize_by_pointer=*/ true>
 {
 public:
     static void visitImpl(QueryTreeNodePtr & node)

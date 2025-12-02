@@ -57,7 +57,7 @@ namespace
 {
 
 /// Visitor that collect column source to columns mapping from query and all subqueries
-class CollectColumnSourceToColumnsVisitor : public InDepthQueryTreeVisitor<CollectColumnSourceToColumnsVisitor>
+class CollectColumnSourceToColumnsVisitor : public InDepthQueryTreeVisitor<CollectColumnSourceToColumnsVisitor, /*const_visitor=*/ false, /*memoize_by_pointer=*/ true>
 {
 public:
     struct Columns
@@ -700,10 +700,10 @@ QueryTreeNodePtr buildQueryTreeForShard(const PlannerContextPtr & planner_contex
     return query_tree_to_modify;
 }
 
-class CollectStoragesVisitor : public InDepthQueryTreeVisitor<CollectStoragesVisitor>
+class CollectStoragesVisitor : public InDepthQueryTreeVisitor<CollectStoragesVisitor, /*const_visitor=*/ false, /*memoize_by_pointer=*/ true>
 {
 public:
-    using Base = InDepthQueryTreeVisitor<CollectStoragesVisitor>;
+    using Base = InDepthQueryTreeVisitor<CollectStoragesVisitor, /*const_visitor=*/ false, /*memoize_by_pointer=*/ true>;
     using Base::Base;
 
     void visitImpl(QueryTreeNodePtr & node)
@@ -723,10 +723,10 @@ public:
     std::vector<StoragePtr> storages;
 };
 
-class RewriteJoinToGlobalJoinVisitor : public InDepthQueryTreeVisitorWithContext<RewriteJoinToGlobalJoinVisitor>
+class RewriteJoinToGlobalJoinVisitor : public InDepthQueryTreeVisitorWithContext<RewriteJoinToGlobalJoinVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<RewriteJoinToGlobalJoinVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<RewriteJoinToGlobalJoinVisitor, /*memoize_by_pointer=*/ true>;
     using Base::Base;
 
     static bool allStoragesAreMergeTree(QueryTreeNodePtr & node)

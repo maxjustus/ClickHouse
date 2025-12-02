@@ -252,7 +252,7 @@ private:
     bool is_inside_index_hint_function = false;
 };
 
-class CollectPrewhereTableExpressionVisitor : public ConstInDepthQueryTreeVisitor<CollectPrewhereTableExpressionVisitor>
+class CollectPrewhereTableExpressionVisitor : public ConstInDepthQueryTreeVisitor<CollectPrewhereTableExpressionVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
     explicit CollectPrewhereTableExpressionVisitor(const QueryTreeNodePtr & query_node_)

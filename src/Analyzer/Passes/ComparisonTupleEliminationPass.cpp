@@ -20,10 +20,10 @@ namespace DB
 namespace
 {
 
-class ComparisonTupleEliminationPassVisitor : public InDepthQueryTreeVisitorWithContext<ComparisonTupleEliminationPassVisitor>
+class ComparisonTupleEliminationPassVisitor : public InDepthQueryTreeVisitorWithContext<ComparisonTupleEliminationPassVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ComparisonTupleEliminationPassVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<ComparisonTupleEliminationPassVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     static bool needChildVisit(QueryTreeNodePtr & parent, QueryTreeNodePtr & child)

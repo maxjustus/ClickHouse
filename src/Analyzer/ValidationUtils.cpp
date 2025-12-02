@@ -149,7 +149,7 @@ bool compareGroupByKeys(const QueryTreeNodePtr & node, const QueryTreeNodePtr & 
 namespace
 {
 
-class ValidateGroupByColumnsVisitor : public ConstInDepthQueryTreeVisitor<ValidateGroupByColumnsVisitor>
+class ValidateGroupByColumnsVisitor : public ConstInDepthQueryTreeVisitor<ValidateGroupByColumnsVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
     explicit ValidateGroupByColumnsVisitor(const QueryTreeNodes & group_by_keys_nodes_, const QueryTreeNodePtr & query_node_)
@@ -381,7 +381,7 @@ void validateAggregates(const QueryTreeNodePtr & query_node, AggregatesValidatio
 namespace
 {
 
-class ValidateFunctionNodesVisitor : public ConstInDepthQueryTreeVisitor<ValidateFunctionNodesVisitor>
+class ValidateFunctionNodesVisitor : public ConstInDepthQueryTreeVisitor<ValidateFunctionNodesVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
     explicit ValidateFunctionNodesVisitor(std::string_view function_name_,

@@ -19,10 +19,10 @@ namespace DB
 namespace
 {
 
-class ShardNumColumnToFunctionVisitor : public InDepthQueryTreeVisitorWithContext<ShardNumColumnToFunctionVisitor>
+class ShardNumColumnToFunctionVisitor : public InDepthQueryTreeVisitorWithContext<ShardNumColumnToFunctionVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ShardNumColumnToFunctionVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<ShardNumColumnToFunctionVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node) const

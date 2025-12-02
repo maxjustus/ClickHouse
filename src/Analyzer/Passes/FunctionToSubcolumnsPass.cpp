@@ -572,10 +572,10 @@ std::tuple<FunctionNode *, ColumnNode *, TableNode *> getTypedNodesForOptimizati
 }
 
 /// First pass collects info about identifiers to determine which identifiers are allowed to optimize.
-class FunctionToSubcolumnsVisitorFirstPass : public InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorFirstPass>
+class FunctionToSubcolumnsVisitorFirstPass : public InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorFirstPass, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorFirstPass>;
+    using Base = InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorFirstPass, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(const QueryTreeNodePtr & node)
@@ -808,7 +808,7 @@ private:
 /// For identifiers in `filter_only`, the rewrite is restricted to WHERE/PREWHERE
 /// clauses only, because in post-aggregation clauses (HAVING, ORDER BY, etc.)
 /// the subcolumn would not be present in the block after GROUP BY.
-class FunctionToSubcolumnsVisitorSecondPass : public InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorSecondPass>
+class FunctionToSubcolumnsVisitorSecondPass : public InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorSecondPass, true /*memoize_by_pointer*/>
 {
 private:
     IdentifiersToOptimize identifiers_to_optimize;
@@ -819,7 +819,7 @@ private:
     std::vector<bool> in_where_prewhere_stack;
 
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorSecondPass>;
+    using Base = InDepthQueryTreeVisitorWithContext<FunctionToSubcolumnsVisitorSecondPass, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     FunctionToSubcolumnsVisitorSecondPass(ContextPtr context_,

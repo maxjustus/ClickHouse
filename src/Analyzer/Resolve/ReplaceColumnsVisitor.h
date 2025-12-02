@@ -13,7 +13,7 @@ namespace ErrorCodes
 }
 
 /// Used to replace columns that changed type because of JOIN to their original type
-class ReplaceColumnsVisitor : public InDepthQueryTreeVisitor<ReplaceColumnsVisitor>
+class ReplaceColumnsVisitor : public InDepthQueryTreeVisitor<ReplaceColumnsVisitor, false /*const_visitor*/, true /*memoize_by_pointer*/>
 {
 public:
     explicit ReplaceColumnsVisitor(const QueryTreeNodePtrWithHashMap<QueryTreeNodePtr> & replacement_map_, const ContextPtr & context_)

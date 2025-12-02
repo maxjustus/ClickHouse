@@ -568,10 +568,10 @@ void tryOptimizeCommonExpressions(QueryTreeNodePtr & node, FunctionNode& functio
 
 
 /// Visitor that optimizes logical expressions _only_ in JOIN ON section
-class JoinOnLogicalExpressionOptimizerVisitor : public InDepthQueryTreeVisitorWithContext<JoinOnLogicalExpressionOptimizerVisitor>
+class JoinOnLogicalExpressionOptimizerVisitor : public InDepthQueryTreeVisitorWithContext<JoinOnLogicalExpressionOptimizerVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<JoinOnLogicalExpressionOptimizerVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<JoinOnLogicalExpressionOptimizerVisitor, true /*memoize_by_pointer*/>;
 
     explicit JoinOnLogicalExpressionOptimizerVisitor(const JoinNode & join_node_, ContextPtr context)
         : Base(std::move(context))
@@ -825,10 +825,10 @@ private:
     }
 };
 
-class LogicalExpressionOptimizerVisitor : public InDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor>
+class LogicalExpressionOptimizerVisitor : public InDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor, true /*memoize_by_pointer*/>;
 
     explicit LogicalExpressionOptimizerVisitor(ContextPtr context)
         : Base(std::move(context))

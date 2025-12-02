@@ -97,10 +97,10 @@ void wrapIntoToString(FunctionNode & function_node, QueryTreeNodePtr arg, Contex
     assert(isString(removeNullable(function_node.getResultType())));
 }
 
-class ConvertStringsToEnumVisitor : public InDepthQueryTreeVisitorWithContext<ConvertStringsToEnumVisitor>
+class ConvertStringsToEnumVisitor : public InDepthQueryTreeVisitorWithContext<ConvertStringsToEnumVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ConvertStringsToEnumVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<ConvertStringsToEnumVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

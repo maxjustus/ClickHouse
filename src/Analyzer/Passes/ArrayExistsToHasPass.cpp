@@ -18,10 +18,10 @@ namespace Setting
 namespace
 {
 
-class RewriteArrayExistsToHasVisitor : public InDepthQueryTreeVisitorWithContext<RewriteArrayExistsToHasVisitor>
+class RewriteArrayExistsToHasVisitor : public InDepthQueryTreeVisitorWithContext<RewriteArrayExistsToHasVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<RewriteArrayExistsToHasVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<RewriteArrayExistsToHasVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

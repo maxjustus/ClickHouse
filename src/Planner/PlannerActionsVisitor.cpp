@@ -20,6 +20,7 @@
 #include <DataTypes/FieldToDataType.h>
 
 #include <Common/FieldVisitorToString.h>
+#include <Common/HashTable/HashSet.h>
 #include <Common/quoteString.h>
 
 #include <Columns/ColumnSet.h>
@@ -710,6 +711,7 @@ private:
 
     std::vector<ActionsScopeNode> actions_stack;
     std::unordered_map<QueryTreeNodePtr, std::string> node_to_node_name;
+    HashSet<const IQueryTreeNode *> visited_nodes_at_base_level;
     CorrelatedSubtrees correlated_subtrees;
     const PlannerContextPtr planner_context;
     const ColumnNodePtrWithHashSet & correlated_columns_set;
@@ -754,6 +756,13 @@ std::pair<ActionsDAG::NodeRawConstPtrs, CorrelatedSubtrees> PlannerActionsVisito
 
 PlannerActionsVisitorImpl::NodeNameAndNodeMinLevel PlannerActionsVisitorImpl::visitImpl(QueryTreeNodePtr node)
 {
+    /// Memoize at base level (no lambdas) - safe because no stack propagation needed
+    if (actions_stack.size() == 1)
+    {
+        if (!visited_nodes_at_base_level.insert(node.get()).second)
+            return {action_node_name_helper.calculateActionNodeName(node), Levels(0)};
+    }
+
     auto node_type = node->getNodeType();
 
     switch (node_type)

@@ -37,7 +37,7 @@ namespace ErrorCodes
 namespace
 {
 
-class CollectSetsVisitor : public ConstInDepthQueryTreeVisitor<CollectSetsVisitor>
+class CollectSetsVisitor : public ConstInDepthQueryTreeVisitor<CollectSetsVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
     explicit CollectSetsVisitor(PlannerContext & planner_context_)

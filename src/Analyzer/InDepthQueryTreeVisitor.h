@@ -1,8 +1,11 @@
 #pragma once
 
+#include <variant>
+
 #include <base/scope_guard.h>
 
 #include <Common/Exception.h>
+#include <Common/HashTable/HashSet.h>
 
 #include <Analyzer/IQueryTreeNode.h>
 #include <Analyzer/QueryNode.h>
@@ -26,6 +29,12 @@ namespace ErrorCodes
   * By default visitor traverse tree from top to bottom, if bottom to top traverse is required subclass
   * can override `shouldTraverseTopToBottom` method.
   *
+  * Template parameters:
+  * - Derived: CRTP derived class
+  * - const_visitor: if true, visitor cannot modify nodes
+  * - memoize_by_pointer: if true, skip nodes already visited (by pointer identity).
+  *   Safe for all visitors since same pointer = same object.
+  *
   * Usage example:
   * class FunctionsVisitor : public InDepthQueryTreeVisitor<FunctionsVisitor>
   * {
@@ -36,7 +45,7 @@ namespace ErrorCodes
   *     }
   * }
   */
-template <typename Derived, bool const_visitor = false>
+template <typename Derived, bool const_visitor = false, bool memoize_by_pointer = false>
 class InDepthQueryTreeVisitor
 {
 public:
@@ -56,6 +65,12 @@ public:
 
     void visit(VisitQueryTreeNodeType & query_tree_node)
     {
+        if constexpr (memoize_by_pointer)
+        {
+            if (!visited_nodes.insert(query_tree_node.get()).second)
+                return;
+        }
+
         bool traverse_top_to_bottom = getDerived().shouldTraverseTopToBottom();
         if (!traverse_top_to_bottom)
             visitChildren(query_tree_node);
@@ -90,10 +105,12 @@ private:
                 visit(child);
         }
     }
+
+    [[no_unique_address]] std::conditional_t<memoize_by_pointer, HashSet<const IQueryTreeNode *>, std::monostate> visited_nodes;
 };
 
-template <typename Derived>
-using ConstInDepthQueryTreeVisitor = InDepthQueryTreeVisitor<Derived, true /*const_visitor*/>;
+template <typename Derived, bool memoize_by_pointer = false>
+using ConstInDepthQueryTreeVisitor = InDepthQueryTreeVisitor<Derived, true /*const_visitor*/, memoize_by_pointer>;
 
 /** Same as InDepthQueryTreeVisitor (but has a different interface) and additionally keeps track of current scope context.
   * This can be useful if your visitor has special logic that depends on current scope context.
@@ -102,8 +119,14 @@ using ConstInDepthQueryTreeVisitor = InDepthQueryTreeVisitor<Derived, true /*con
   * 1. needChildVisit – This methods allows to skip subtree.
   * 2. enterImpl – This method is called before children are processed.
   * 3. leaveImpl – This method is called after children are processed.
+  *
+  * Template parameters:
+  * - memoize_by_pointer: if true, skip nodes already visited (by pointer identity).
+  *   WARNING: Use with caution! This visitor tracks context (subquery_depth, current_context)
+  *   which depends on the path taken. If the same node can be reached via different paths,
+  *   memoization may give incorrect results. Only enable if your visitor doesn't depend on context.
   */
-template <typename Derived>
+template <typename Derived, bool memoize_by_pointer = false>
 class InDepthQueryTreeVisitorWithContext
 {
 public:
@@ -137,6 +160,12 @@ public:
 
     void visit(VisitQueryTreeNodeType & query_tree_node)
     {
+        if constexpr (memoize_by_pointer)
+        {
+            if (!visited_nodes.insert(query_tree_node.get()).second)
+                return;
+        }
+
         auto current_scope_context_ptr = current_context;
         SCOPE_EXIT(
             current_context = std::move(current_scope_context_ptr);
@@ -214,8 +243,17 @@ private:
         }
     }
 
+protected:
+    void resetVisitedNodes()
+    {
+        if constexpr (memoize_by_pointer)
+            visited_nodes.clear();
+    }
+
+private:
     ContextPtr current_context;
     size_t subquery_depth = 0;
+    [[no_unique_address]] std::conditional_t<memoize_by_pointer, HashSet<const IQueryTreeNode *>, std::monostate> visited_nodes;
 };
 
 }

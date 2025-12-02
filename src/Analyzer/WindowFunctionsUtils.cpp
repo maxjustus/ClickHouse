@@ -15,7 +15,7 @@ namespace ErrorCodes
 namespace
 {
 
-class CollectWindowFunctionNodeVisitor : public ConstInDepthQueryTreeVisitor<CollectWindowFunctionNodeVisitor>
+class CollectWindowFunctionNodeVisitor : public ConstInDepthQueryTreeVisitor<CollectWindowFunctionNodeVisitor, true /*memoize_by_pointer*/>
 {
 public:
     explicit CollectWindowFunctionNodeVisitor(QueryTreeNodes * window_function_nodes_)

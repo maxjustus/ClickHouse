@@ -18,10 +18,10 @@ namespace Setting
 namespace
 {
 
-class IfChainToMultiIfPassVisitor : public InDepthQueryTreeVisitorWithContext<IfChainToMultiIfPassVisitor>
+class IfChainToMultiIfPassVisitor : public InDepthQueryTreeVisitorWithContext<IfChainToMultiIfPassVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<IfChainToMultiIfPassVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<IfChainToMultiIfPassVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     explicit IfChainToMultiIfPassVisitor(FunctionOverloadResolverPtr multi_if_function_ptr_, ContextPtr context)

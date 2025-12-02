@@ -408,7 +408,7 @@ struct ColumnPrice
 using ColumnPriceByName = std::unordered_map<String, ColumnPrice>;
 using ColumnPriceByQueryNode = QueryTreeNodePtrWithHashMap<ColumnPrice>;
 
-class ComponentCollectorVisitor : public ConstInDepthQueryTreeVisitor<ComponentCollectorVisitor>
+class ComponentCollectorVisitor : public ConstInDepthQueryTreeVisitor<ComponentCollectorVisitor, true /*memoize_by_pointer*/>
 {
 public:
     ComponentCollectorVisitor(
@@ -434,7 +434,7 @@ private:
     const ComparisonGraph<QueryTreeNodePtr> & graph;
 };
 
-class ColumnNameCollectorVisitor : public ConstInDepthQueryTreeVisitor<ColumnNameCollectorVisitor>
+class ColumnNameCollectorVisitor : public ConstInDepthQueryTreeVisitor<ColumnNameCollectorVisitor, true /*memoize_by_pointer*/>
 {
 public:
     ColumnNameCollectorVisitor(
@@ -707,10 +707,10 @@ void optimizeNode(QueryTreeNodePtr & node, const QueryTreeNodes & table_expressi
     node = std::move(new_node);
 }
 
-class ConvertQueryToCNFVisitor : public InDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor>
+class ConvertQueryToCNFVisitor : public InDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

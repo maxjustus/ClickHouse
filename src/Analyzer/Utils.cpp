@@ -784,7 +784,7 @@ QueryTreeNodes buildTableExpressionsStack(const QueryTreeNodePtr & join_tree_nod
 namespace
 {
 
-class CheckFunctionExistsVisitor : public ConstInDepthQueryTreeVisitor<CheckFunctionExistsVisitor>
+class CheckFunctionExistsVisitor : public ConstInDepthQueryTreeVisitor<CheckFunctionExistsVisitor, true /*memoize_by_pointer*/>
 {
 public:
     explicit CheckFunctionExistsVisitor(std::string_view function_name_)
@@ -857,7 +857,7 @@ bool hasFunctionNode(const QueryTreeNodePtr & node, std::string_view function_na
 namespace
 {
 
-class ReplaceColumnsVisitor : public InDepthQueryTreeVisitor<ReplaceColumnsVisitor>
+class ReplaceColumnsVisitor : public InDepthQueryTreeVisitor<ReplaceColumnsVisitor, false /*const_visitor*/, true /*memoize_by_pointer*/>
 {
 public:
     explicit ReplaceColumnsVisitor(const QueryTreeNodePtr & table_expression_node_,
@@ -933,7 +933,7 @@ void rerunFunctionResolve(FunctionNode * function_node, ContextPtr context)
 namespace
 {
 
-class CollectIdentifiersFullNamesVisitor : public ConstInDepthQueryTreeVisitor<CollectIdentifiersFullNamesVisitor>
+class CollectIdentifiersFullNamesVisitor : public ConstInDepthQueryTreeVisitor<CollectIdentifiersFullNamesVisitor, true /*memoize_by_pointer*/>
 {
 public:
     explicit CollectIdentifiersFullNamesVisitor(NameSet & used_identifiers_)

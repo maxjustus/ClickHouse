@@ -179,10 +179,10 @@ std::vector<const QueryNode *> getSupportingParallelReplicasQueries(const IQuery
     return res;
 }
 
-class ReplaceTableNodeToDummyVisitor : public InDepthQueryTreeVisitorWithContext<ReplaceTableNodeToDummyVisitor>
+class ReplaceTableNodeToDummyVisitor : public InDepthQueryTreeVisitorWithContext<ReplaceTableNodeToDummyVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ReplaceTableNodeToDummyVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<ReplaceTableNodeToDummyVisitor, /*memoize_by_pointer=*/ true>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

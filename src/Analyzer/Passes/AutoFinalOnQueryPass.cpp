@@ -20,10 +20,10 @@ namespace Setting
 namespace
 {
 
-class AutoFinalOnQueryPassVisitor : public InDepthQueryTreeVisitorWithContext<AutoFinalOnQueryPassVisitor>
+class AutoFinalOnQueryPassVisitor : public InDepthQueryTreeVisitorWithContext<AutoFinalOnQueryPassVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<AutoFinalOnQueryPassVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<AutoFinalOnQueryPassVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

@@ -8,7 +8,7 @@
 namespace DB
 {
 
-class TableFunctionsWithClusterAlternativesVisitor : public InDepthQueryTreeVisitor<TableFunctionsWithClusterAlternativesVisitor, /*const_visitor=*/true>
+class TableFunctionsWithClusterAlternativesVisitor : public InDepthQueryTreeVisitor<TableFunctionsWithClusterAlternativesVisitor, /*const_visitor=*/true, /*memoize_by_pointer=*/ true>
 {
 public:
     void visitImpl(const QueryTreeNodePtr & node)

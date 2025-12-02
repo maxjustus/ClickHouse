@@ -139,10 +139,10 @@ void OptimizeShardingKeyRewriteInMatcher::visit(ASTFunction & function, Data & d
 }
 
 
-class OptimizeShardingKeyRewriteIn : public InDepthQueryTreeVisitorWithContext<OptimizeShardingKeyRewriteIn>
+class OptimizeShardingKeyRewriteIn : public InDepthQueryTreeVisitorWithContext<OptimizeShardingKeyRewriteIn, /*memoize_by_pointer=*/ true>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<OptimizeShardingKeyRewriteIn>;
+    using Base = InDepthQueryTreeVisitorWithContext<OptimizeShardingKeyRewriteIn, /*memoize_by_pointer=*/ true>;
 
     OptimizeShardingKeyRewriteIn(OptimizeShardingKeyRewriteInVisitor::Data data_, ContextPtr context)
         : Base(std::move(context))

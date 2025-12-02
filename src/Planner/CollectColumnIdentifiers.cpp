@@ -16,7 +16,7 @@ namespace DB
 namespace
 {
 
-class CollectTopLevelColumnIdentifiersVisitor : public ConstInDepthQueryTreeVisitor<CollectTopLevelColumnIdentifiersVisitor>
+class CollectTopLevelColumnIdentifiersVisitor : public ConstInDepthQueryTreeVisitor<CollectTopLevelColumnIdentifiersVisitor, /*memoize_by_pointer=*/ true>
 {
 public:
 
