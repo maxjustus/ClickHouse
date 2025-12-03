@@ -3,6 +3,7 @@
 #include <unordered_map>
 
 #include <Common/HashTable/HashMap.h>
+#include <Common/HashTable/HashSet.h>
 #include <Common/SipHash.h>
 
 #include <IO/WriteBuffer.h>
@@ -181,6 +182,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
     HashState hash_state;
 
     HashMap<const IQueryTreeNode *, size_t> weak_node_to_identifier;
+    HashSet<const IQueryTreeNode *> visited_nodes;
 
     std::vector<std::pair<const IQueryTreeNode *, bool>> nodes_to_process;
     nodes_to_process.emplace_back(this, false);
@@ -189,6 +191,13 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
     {
         const auto [node_to_process, is_weak_node] = nodes_to_process.back();
         nodes_to_process.pop_back();
+
+        /// Skip already-visited regular nodes (matches isEqual semantics)
+        if (!is_weak_node)
+        {
+            if (!visited_nodes.insert(node_to_process).second)
+                continue;
+        }
 
         if (is_weak_node)
         {
@@ -358,6 +367,8 @@ QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const QueryTreeNodePtr & node_t
 
 ASTPtr IQueryTreeNode::toAST(const ConvertToASTOptions & options) const
 {
+    /// When toAST_cache is provided, returned AST nodes may be shared across calls.
+    /// Any code that mutates AST nodes must clone() before mutating.
     if (options.toAST_cache)
     {
         if (auto * it = options.toAST_cache->find(this))
