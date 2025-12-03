@@ -6,6 +6,7 @@
 
 #include <Parsers/IAST_fwd.h>
 #include <Common/Exception.h>
+#include <Common/HashTable/HashMap.h>
 #include <Common/TypePromotion.h>
 
 #include <city.h>
@@ -82,6 +83,9 @@ struct ConvertToASTOptions
 
     /// Set CTE name in ASTSubquery field.
     bool set_subquery_cte_name = true;
+
+    /// Optional cache for memoizing toAST() on shared nodes (caller-provided, scoped to single call tree)
+    mutable HashMap<const IQueryTreeNode *, ASTPtr> * toAST_cache = nullptr;
 };
 
 class IQueryTreeNode : public TypePromotion<IQueryTreeNode>
