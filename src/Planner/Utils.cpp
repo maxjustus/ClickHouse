@@ -175,9 +175,11 @@ ASTPtr queryNodeToSelectQuery(const QueryTreeNodePtr & query_node, bool set_subq
 
     // In case of cross-replication we don't know what database is used for the table.
     // Each shard will use the default database (in the case of cross-replication shards may have different defaults).
+    HashMap<const IQueryTreeNode *, ASTPtr> toAST_cache;
     auto result_ast = query_node_typed.toAST({
         .qualify_indentifiers_with_database = false,
-        .set_subquery_cte_name = set_subquery_cte_name
+        .set_subquery_cte_name = set_subquery_cte_name,
+        .toAST_cache = &toAST_cache
     });
 
     while (true)
