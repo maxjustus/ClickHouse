@@ -62,6 +62,10 @@ protected:
 
     size_t readColumn(IColumn & column, const DataTypePtr & type, const SerializationPtr & serialization, const String & column_name);
 
+    /// Validates that all blocks have consistent column schema.
+    /// Throws exception if schema mismatch detected.
+    void validateBlockSchema(const std::vector<UInt8> & seen_columns);
+
     const FormatSettings format_settings;
     const NamesAndTypes fields;
     /// Maps column names and their positions in header.
@@ -70,6 +74,10 @@ protected:
     std::unique_ptr<JSONColumnsReaderBase> reader;
     BlockMissingValues block_missing_values;
     size_t approx_bytes_read_for_chunk = 0;
+
+    /// For schema validation across blocks
+    bool first_block_schema_recorded = false;
+    std::unordered_set<String> expected_column_names;
 };
 
 

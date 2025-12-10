@@ -1003,6 +1003,15 @@ Deserialize maps columns as JSON arrays of tuples.
 
 Disabled by default.
 )", 0) \
+    DECLARE(UInt64, output_format_json_columns_block_size, 0, R"(
+When set to a non-zero value, the JSONColumns output format will output rows in blocks of this size, with each block being a separate JSON object separated by newlines.
+
+For example, with `output_format_json_columns_block_size=100`, a result set of 1000 rows will be output as 10 separate JSON blocks, each containing 100 rows.
+
+This is useful for streaming output to clients that process blocks independently.
+
+Default value: 0 (output all rows in a single JSON block).
+)", 0) \
     \
     DECLARE(String, format_json_object_each_row_column_for_object_name, "", R"(
 The name of column that will be used for storing/writing object names in [JSONObjectEachRow](/interfaces/formats/JSONObjectEachRow) format.

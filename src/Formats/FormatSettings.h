@@ -271,6 +271,14 @@ struct FormatSettings
         String column_for_object_name{};
     } json_object_each_row{};
 
+    struct
+    {
+        /// Number of rows to output in each JSON block (0 = single block).
+        /// When > 0, each block of N rows is output as a separate JSON object,
+        /// separated by newlines. Useful for streaming output.
+        UInt64 output_block_size = 0;
+    } json_columns{};
+
     enum class ParquetVersion : uint8_t
     {
         V1_0,

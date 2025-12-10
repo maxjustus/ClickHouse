@@ -186,6 +186,10 @@ Chunk JSONColumnsBlockInputFormatBase::read()
     }
     while (!reader->checkChunkEndOrSkipColumnDelimiter());
 
+    // Validate schema consistency across blocks
+    if (rows > 0)
+        validateBlockSchema(seen_columns);
+
     approx_bytes_read_for_chunk = getDataOffsetMaybeCompressed(*in) - chunk_start;
 
     if (rows <= 0)
@@ -206,6 +210,60 @@ Chunk JSONColumnsBlockInputFormatBase::read()
     }
 
     return Chunk(std::move(columns), rows);
+}
+
+void JSONColumnsBlockInputFormatBase::validateBlockSchema(const std::vector<UInt8> & seen_columns)
+{
+    // Only validate named formats (compact formats don't have column names)
+    if (name_to_index.empty())
+        return;
+
+    // Collect column names that appeared in this block
+    std::unordered_set<String> current_block_columns;
+    for (size_t i = 0; i < seen_columns.size(); ++i)
+    {
+        if (seen_columns[i])
+            current_block_columns.insert(fields[i].name);
+    }
+
+    // Empty blocks don't affect schema
+    if (current_block_columns.empty())
+        return;
+
+    if (!first_block_schema_recorded)
+    {
+        // First non-empty block - record the schema
+        expected_column_names = current_block_columns;
+        first_block_schema_recorded = true;
+    }
+    else if (current_block_columns != expected_column_names)
+    {
+        // Subsequent blocks - verify schema matches
+        // Format column names for error message
+        String expected_cols_str;
+        for (const auto & col : expected_column_names)
+        {
+            if (!expected_cols_str.empty())
+                expected_cols_str += ", ";
+            expected_cols_str += col;
+        }
+
+        String current_cols_str;
+        for (const auto & col : current_block_columns)
+        {
+            if (!current_cols_str.empty())
+                current_cols_str += ", ";
+            current_cols_str += col;
+        }
+
+        throw Exception(
+            ErrorCodes::INCORRECT_DATA,
+            "Schema mismatch between JSON blocks. "
+            "First block has columns [{}], current block has columns [{}]",
+            expected_cols_str,
+            current_cols_str
+        );
+    }
 }
 
 JSONColumnsSchemaReaderBase::JSONColumnsSchemaReaderBase(

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <Columns/IColumn.h>
 #include <Formats/JSONUtils.h>
 #include <Processors/Formats/Impl/JSONColumnsBlockOutputFormatBase.h>
@@ -36,7 +37,34 @@ void JSONColumnsBlockOutputFormatBase::consume(Chunk chunk)
 
 void JSONColumnsBlockOutputFormatBase::writeSuffix()
 {
-    writeChunk(mono_chunk);
+    if (format_settings.json_columns.output_block_size == 0 || mono_chunk.getNumRows() == 0)
+    {
+        // Single block mode or empty data
+        writeChunk(mono_chunk);
+    }
+    else
+    {
+        // Multi-block mode: split chunk into blocks of specified size
+        size_t block_size = format_settings.json_columns.output_block_size;
+        size_t total_rows = mono_chunk.getNumRows();
+        const auto & columns = mono_chunk.getColumns();
+
+        for (size_t offset = 0; offset < total_rows; offset += block_size)
+        {
+            size_t rows_in_block = std::min(block_size, total_rows - offset);
+
+            // Slice each column manually
+            Columns sliced_columns;
+            for (const auto & col : columns)
+            {
+                sliced_columns.push_back(col->cut(offset, rows_in_block));
+            }
+
+            Chunk block_chunk(std::move(sliced_columns), rows_in_block);
+            writeChunk(block_chunk);
+            // writeChunk() calls writeChunkEnd() which writes the newline
+        }
+    }
     mono_chunk.clear();
 }
 

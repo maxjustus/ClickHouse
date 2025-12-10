@@ -20,10 +20,10 @@ The output of the JSONColumns* formats provides the ClickHouse field name and th
 visually, the data is rotated 90 degrees to the left.
 :::
 
-In this format, all data is represented as a single JSON Object.
+In this format, data is represented as JSON objects (one or more). By default, all data is output as a single JSON Object. The input side supports multiple newline-separated JSON blocks for streaming data without buffering.
 
 :::note
-The `JSONColumns` format buffers all data in memory and then outputs it as a single block, so, it can lead to high memory consumption.
+The `JSONColumns` format buffers all data in memory. When outputting, by default all data is output as a single block, which can lead to high memory consumption. Use the `output_format_json_columns_block_size` setting to split output into multiple blocks for streaming scenarios.
 :::
 
 ## Example usage {#example-usage}
@@ -72,7 +72,46 @@ The output will be in JSON format:
 }
 ```
 
+## Multiple blocks support {#multiple-blocks}
+
+The `JSONColumns` format supports reading and writing multiple JSON blocks for streaming scenarios.
+
+### Input: Multiple blocks {#input-multiple-blocks}
+
+When inserting, you can provide multiple JSON blocks separated by newlines. Each block represents a set of rows and will be processed as it arrives, enabling progressive processing without buffering the entire dataset in memory.
+
+Example:
+
+```json
+{"a": [1, 2, 3], "b": ["x", "y", "z"]}
+{"a": [4, 5, 6], "b": ["p", "q", "r"]}
+```
+
+All blocks must have the same set of columns (though column order can vary).
+
+### Output: Split into blocks {#output-multiple-blocks}
+
+Use the `output_format_json_columns_block_size` setting to split output into multiple blocks. When set to a positive value N, rows are split into blocks of N rows each, with each block output as a separate JSON object.
+
+Example with `output_format_json_columns_block_size=2`:
+
+```json
+{"a": [1, 2], "b": ["x", "y"]}
+{"a": [3, 4], "b": ["z", "p"]}
+```
+
+This is useful for streaming output to clients that process blocks independently.
+
 ## Format settings {#format-settings}
 
-During import, columns with unknown names will be skipped if setting [`input_format_skip_unknown_fields`](/operations/settings/settings-formats.md/#input_format_skip_unknown_fields) is set to `1`.
-Columns that are not present in the block will be filled with default values (you can use the [`input_format_defaults_for_omitted_fields`](/operations/settings/settings-formats.md/#input_format_defaults_for_omitted_fields) setting here)
+- `input_format_skip_unknown_fields` ([`input_format_skip_unknown_fields`](/operations/settings/settings-formats.md/#input_format_skip_unknown_fields)): Skip columns with unknown names. Enabled by default.
+
+- `input_format_defaults_for_omitted_fields` ([`input_format_defaults_for_omitted_fields`](/operations/settings/settings-formats.md/#input_format_defaults_for_omitted_fields)): Fill omitted columns with default values.
+
+- `output_format_json_columns_block_size`: When set to a positive integer N, splits output rows into blocks of N rows each. Default: 0 (output as single block).
+
+Example:
+
+```sql
+SELECT * FROM table FORMAT JSONColumns SETTINGS output_format_json_columns_block_size=100;
+```
