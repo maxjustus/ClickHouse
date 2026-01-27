@@ -635,7 +635,7 @@ void BackupImpl::removeLockFile()
 
 bool BackupImpl::directoryExists(const String & directory) const
 {
-    return !listFiles(directory, true /*recursive*/).empty();
+    return hasFiles(directory);
 }
 
 Strings BackupImpl::listFiles(const String & directory, bool recursive) const

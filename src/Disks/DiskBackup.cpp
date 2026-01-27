@@ -103,18 +103,14 @@ size_t DiskBackup::getFileSize(const String & path) const
     return backup->getFileSize(replaced_path);
 }
 
-void DiskBackup::createDirectory(const String & path)
+void DiskBackup::createDirectory(const String &)
 {
-    std::string replaced_path = replacePathPrefix(path);
-    if (!backup->directoryExists(replaced_path))
-        throw Exception(ErrorCodes::UNSUPPORTED_METHOD, "DiskBackup does not support createDirectory method");
+    throw Exception(ErrorCodes::UNSUPPORTED_METHOD, "DiskBackup does not support createDirectory method");
 }
 
-void DiskBackup::createDirectories(const String & path)
+void DiskBackup::createDirectories(const String &)
 {
-    std::string replaced_path = replacePathPrefix(path);
-    if (!backup->directoryExists(replaced_path))
-        throw Exception(ErrorCodes::UNSUPPORTED_METHOD, "DiskBackup does not support createDirectories method");
+    throw Exception(ErrorCodes::UNSUPPORTED_METHOD, "DiskBackup does not support createDirectories method");
 }
 
 void DiskBackup::clearDirectory(const String &)
