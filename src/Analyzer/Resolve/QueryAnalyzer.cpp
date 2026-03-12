@@ -1383,6 +1383,18 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
             {
                 auto result = *cached_result;
 
+                /// Clone IN/EXISTS function nodes when rewrite_in_to_join is enabled,
+                /// so each alias reference gets an independent copy for unique table alias generation.
+                if (scope.context->getSettingsRef()[Setting::rewrite_in_to_join])
+                {
+                    if (auto * function_node = result.resolved_identifier->as<FunctionNode>())
+                    {
+                        const auto & func_name = function_node->getFunctionName();
+                        if (isNameOfLocalInFunction(func_name) || func_name == "exists")
+                            result.resolved_identifier = result.resolved_identifier->clone();
+                    }
+                }
+
                 return result;
             }
         }
