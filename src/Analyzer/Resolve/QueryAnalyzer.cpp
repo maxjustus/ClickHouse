@@ -5555,7 +5555,10 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
         resolveGroupByNode(query_node_typed, scope);
 
     if (scope.group_by_use_nulls)
+    {
         resolved_expressions.clear();
+        scope.identifier_to_resolved_expression_cache.clear();
+    }
 
     if (query_node_typed.hasHaving())
         resolveExpressionNode(query_node_typed.getHaving(), scope, false /*allow_lambda_expression*/, false /*allow_table_expression*/);
