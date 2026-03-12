@@ -86,7 +86,6 @@ namespace Setting
     extern const SettingsUInt64 max_subquery_depth;
     extern const SettingsBool prefer_column_name_to_alias;
     extern const SettingsBool rewrite_count_distinct_if_with_count_distinct_implementation;
-    extern const SettingsBool rewrite_in_to_join;
     extern const SettingsBool single_join_prefer_left_table;
     extern const SettingsUInt64 use_structure_from_insertion_table_in_table_functions;
     extern const SettingsBool allow_suspicious_types_in_group_by;
