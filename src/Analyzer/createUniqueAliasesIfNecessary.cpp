@@ -115,10 +115,13 @@ public:
             auto * function_node = node->as<FunctionNode>();
             if (isNameOfInFunction(function_node->getFunctionName()))
             {
-                auto arg = function_node->getArguments().getNodes().back();
+                auto & arg = function_node->getArguments().getNodes().back();
                 /// Avoid aliasing IN `table`
                 if (arg->getNodeType() != QueryTreeNodeType::TABLE)
-                    CreateUniqueTableAliasesVisitor(getContext()).visit(function_node->getArguments().getNodes().back());
+                {
+                    arg = arg->clone();
+                    CreateUniqueTableAliasesVisitor(getContext()).visit(arg);
+                }
             }
         }
     }
