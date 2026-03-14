@@ -119,8 +119,12 @@ public:
                 /// Avoid aliasing IN `table`
                 if (arg->getNodeType() != QueryTreeNodeType::TABLE)
                 {
-                    arg = arg->clone();
-                    CreateUniqueTableAliasesVisitor(getContext()).visit(arg);
+                    /// Clone the entire IN function node so that shared references
+                    /// (e.g. from the alias expression cache) each get an independent
+                    /// copy before we mutate the subquery argument in place.
+                    node = node->clone();
+                    function_node = node->as<FunctionNode>();
+                    CreateUniqueTableAliasesVisitor(getContext()).visit(function_node->getArguments().getNodes().back());
                 }
             }
         }
