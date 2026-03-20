@@ -1,7 +1,9 @@
 #include <Analyzer/Resolve/IdentifierResolveScope.h>
 
+#include <Analyzer/FunctionNode.h>
 #include <Analyzer/QueryNode.h>
 #include <Analyzer/UnionNode.h>
+#include <Analyzer/Utils.h>
 #include <Core/Settings.h>
 #include <Interpreters/Context.h>
 
@@ -11,6 +13,7 @@ namespace Setting
 {
     extern const SettingsBool group_by_use_nulls;
     extern const SettingsBool join_use_nulls;
+    extern const SettingsBool rewrite_in_to_join;
 }
 
 namespace ErrorCodes
@@ -119,6 +122,90 @@ void IdentifierResolveScope::pushExpressionNode(const QueryTreeNodePtr & node)
 void IdentifierResolveScope::popExpressionNode()
 {
     expressions_in_resolve_process_stack.pop();
+}
+
+bool IdentifierResolveScope::canCacheIdentifier(
+    const IdentifierLookup & lookup,
+    const IdentifierResolveContext & resolve_context) const
+{
+    if (!identifier_resolve_cache_enabled)
+        return false;
+
+    /// Cannot use cache when the resolve context differs from the default — a cached
+    /// result from a permissive lookup must not be reused in a stricter context that
+    /// disables CTE, database catalog, niladic function, or other resolution paths.
+    if (!resolve_context.isDefaultContext())
+        return false;
+
+    /// Cannot use cache when there is an expression being resolved that has the
+    /// same alias as the identifier we're looking up. Caching in this situation
+    /// would cause transitive aliases to resolve incorrectly.
+    /// Example: SELECT (id + 2) AS id, id AS b FROM test_table;
+    /// Here, `id` inside `(id + 2)` resolves to test_table.id, but `id` in `id AS b`
+    /// should resolve to the alias `(id + 2)`. Caching the first result would break the second.
+    if (expressions_in_resolve_process_stack.hasExpressionWithAlias(lookup.identifier.getFullName()))
+        return false;
+
+    return true;
+}
+
+bool IdentifierResolveScope::containsInOrExistsFunction(const IQueryTreeNode * node)
+{
+    if (!node)
+        return false;
+
+    if (node->getNodeType() == QueryTreeNodeType::FUNCTION)
+    {
+        const auto & func_name = node->as<const FunctionNode &>().getFunctionName();
+        if (isNameOfLocalInFunction(func_name) || func_name == "exists")
+            return true;
+    }
+
+    for (const auto & child : node->getChildren())
+        if (child && containsInOrExistsFunction(child.get()))
+            return true;
+
+    return false;
+}
+
+std::optional<IdentifierResolveResult> IdentifierResolveScope::findCachedIdentifier(
+    const IdentifierLookup & lookup,
+    const IdentifierResolveContext & resolve_context) const
+{
+    if (!canCacheIdentifier(lookup, resolve_context))
+        return {};
+
+    auto it = identifier_resolve_cache.find(lookup);
+    if (it == identifier_resolve_cache.end())
+        return {};
+
+    const auto & entry = it->second;
+    auto result = entry.result;
+
+    if (entry.needs_clone_on_retrieval)
+        result.resolved_identifier = result.resolved_identifier->clone();
+
+    return result;
+}
+
+void IdentifierResolveScope::tryCacheIdentifier(
+    const IdentifierLookup & lookup,
+    const IdentifierResolveResult & result,
+    const IdentifierResolveContext & resolve_context)
+{
+    if (!canCacheIdentifier(lookup, resolve_context))
+        return;
+
+    /// Don't cache nodes that are in `nullable_group_by_keys` — they need different
+    /// treatment depending on whether they're inside an aggregate function or not.
+    if (nullable_group_by_keys.contains(result.resolved_identifier))
+        return;
+
+    bool needs_clone = context
+        && context->getSettingsRef()[Setting::rewrite_in_to_join]
+        && containsInOrExistsFunction(result.resolved_identifier.get());
+
+    identifier_resolve_cache[lookup] = {result, needs_clone};
 }
 
 namespace

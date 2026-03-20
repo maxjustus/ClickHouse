@@ -230,6 +230,21 @@ struct IdentifierResolveContext
         return scope_to_resolve_alias_expression == nullptr;
     }
 
+    /// Returns true when all flags are at their defaults. A cached result from a
+    /// default lookup must not be reused in a stricter context that disables some
+    /// resolution paths (CTEs, database catalog, niladic functions, etc.).
+    bool isDefaultContext() const
+    {
+        return allow_to_check_join_tree
+            && allow_to_check_aliases
+            && allow_to_check_cte
+            && allow_to_check_parent_scopes
+            && allow_to_check_database_catalog
+            && allow_to_resolve_subquery_during_identifier_resolution
+            && allow_to_resolve_niladic_functions
+            && scope_to_resolve_alias_expression == nullptr;
+    }
+
     IdentifierResolveContext & resolveAliasesAt(IdentifierResolveScope * scope_to_resolve_alias_expression_)
     {
         if (!scope_to_resolve_alias_expression)
