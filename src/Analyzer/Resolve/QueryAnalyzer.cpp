@@ -1359,15 +1359,6 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
 
     auto it = scope.identifier_in_lookup_process.find(cache_lookup);
 
-    /// Can not use cache if:
-    /// 1. Identifier is resolved in non-initial context.
-    /// 2. There is an expression that is in resolve process with the same alias.
-    /// Example: SELECT (id + 2) as id, id as b FROM test_table;
-    ///                  ^^
-    /// Here, we cannot cache result of `id` identifier lookup because it is part of expression with alias `id`.
-    /// If we add such entry to the cache it will lead to incorrect resolution of `b` into `test_table.id` instead of `test_table.id` + 2.
-    const bool can_use_cache = identifier_resolve_context.isInitialContext() && !scope.expressions_in_resolve_process_stack.hasExpressionWithAlias(identifier_lookup.identifier.getFullName());
-
     bool already_in_resolve_process = false;
     if (it != scope.identifier_in_lookup_process.end())
     {
@@ -1376,14 +1367,9 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     }
     else
     {
-        if (can_use_cache)
-        {
-            const auto * cached_result = scope.identifier_to_resolved_expression_cache.find(cache_lookup);
-            if (cached_result)
-            {
-                return *cached_result;
-            }
-        }
+        auto cached_result = scope.findCachedIdentifier(cache_lookup, identifier_resolve_context);
+        if (cached_result)
+            return *cached_result;
 
         auto [insert_it, _] = scope.identifier_in_lookup_process.insert({cache_lookup, IdentifierResolveState()});
         it = insert_it;
@@ -1498,14 +1484,8 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     if (it->second.count == 0)
     {
         scope.identifier_in_lookup_process.erase(it);
-        if (can_use_cache && resolve_result.resolved_identifier)
-        {
-            /// Don't cache nodes that are in nullable_group_by_keys - they need different
-            /// treatment depending on whether they're inside an aggregate function or not.
-            bool in_nullable_group_by_keys = scope.nullable_group_by_keys.contains(resolve_result.resolved_identifier);
-            if (!in_nullable_group_by_keys)
-                scope.identifier_to_resolved_expression_cache.insert(cache_lookup, resolve_result);
-        }
+        if (resolve_result.resolved_identifier)
+            scope.tryCacheIdentifier(cache_lookup, resolve_result, identifier_resolve_context);
     }
 
     return resolve_result;
@@ -5497,7 +5477,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     /// Disable cache during join tree resolution - table expressions aren't fully initialized yet,
     /// and with join_use_nulls column types change after join resolution.
-    scope.identifier_to_resolved_expression_cache.disable();
+    scope.disableIdentifierCache();
 
     initializeQueryJoinTreeNode(query_node_typed.getJoinTree(), scope);
     scope.aliases.alias_name_to_table_expression_node = std::move(transitive_aliases);
@@ -5506,7 +5486,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     /// Enable cache after join tree is resolved and all table expressions are registered.
     /// group_by_use_nulls is handled by not caching nodes in nullable_group_by_keys.
-    scope.identifier_to_resolved_expression_cache.enable();
+    scope.enableIdentifierCache();
 
     /// Resolve query node sections.
 
@@ -5525,7 +5505,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
     {
         // allow_resolve_from_using is disabled during prewhere which changes the identifier resolution behavior.
         // Just disable cache during prewhere instead of having a separate cache namespace for prewhere.
-        scope.identifier_to_resolved_expression_cache.disable();
+        scope.disableIdentifierCache();
 
         bool allow_resolve_from_using = scope.allow_resolve_from_using;
         scope.allow_resolve_from_using = false;
@@ -5544,7 +5524,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
         ReplaceColumnsVisitor replace_visitor(scope.join_columns_with_changed_types, scope.context);
         replace_visitor.visit(prewhere_node);
 
-        scope.identifier_to_resolved_expression_cache.enable();
+        scope.enableIdentifierCache();
     }
 
     if (query_node_typed.getWhere())
@@ -5556,7 +5536,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
     if (scope.group_by_use_nulls)
     {
         resolved_expressions.clear();
-        scope.identifier_to_resolved_expression_cache.clear();
+        scope.clearIdentifierCache();
     }
 
     if (query_node_typed.hasHaving())
