@@ -157,7 +157,7 @@ bool IdentifierResolveScope::containsInOrExistsFunction(const IQueryTreeNode * n
     if (node->getNodeType() == QueryTreeNodeType::FUNCTION)
     {
         const auto & func_name = node->as<const FunctionNode &>().getFunctionName();
-        if (isNameOfLocalInFunction(func_name) || func_name == "exists")
+        if (isNameOfInFunction(func_name) || func_name == "exists")
             return true;
     }
 
