@@ -216,7 +216,8 @@ struct IdentifierResolveScope
     /// Identifier resolution cache — prevents AST explosion by sharing resolved alias nodes.
     /// Policy is encapsulated in `findCachedIdentifier` and `tryCacheIdentifier`.
     void disableIdentifierCache() { identifier_resolve_cache_enabled = false; }
-    void enableIdentifierCache() { identifier_resolve_cache_enabled = true; }
+    void enableIdentifierCache() { if (!identifier_resolve_cache_force_disabled) identifier_resolve_cache_enabled = true; }
+    void disableIdentifierCachePermanently() { identifier_resolve_cache_force_disabled = true; identifier_resolve_cache_enabled = false; }
     void clearIdentifierCache() { identifier_resolve_cache.clear(); }
 
     std::optional<IdentifierResolveResult> findCachedIdentifier(
@@ -251,6 +252,7 @@ private:
 
     std::unordered_map<IdentifierLookup, CachedIdentifier, IdentifierLookupHash> identifier_resolve_cache;
     bool identifier_resolve_cache_enabled = true;
+    bool identifier_resolve_cache_force_disabled = false;
 };
 
 }
