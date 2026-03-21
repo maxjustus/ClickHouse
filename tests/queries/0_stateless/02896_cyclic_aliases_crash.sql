@@ -1,12 +1,12 @@
 
 SET max_ast_depth = 10_000_000;
-set enable_analyzer = 0; -- new analyzer resolves ambiguous aliases to alias reference.
 
 SELECT
     val,
     val + 1 as prev,
     val + prev as val
 FROM ( SELECT 1 as val )
+SETTINGS enable_analyzer = 0 -- new analyzer resolves ambiguous aliases to alias reference.
 ; -- { serverError CYCLIC_ALIASES, UNKNOWN_IDENTIFIER, TOO_DEEP_RECURSION }
 
 
