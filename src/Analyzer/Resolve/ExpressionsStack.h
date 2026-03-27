@@ -25,10 +25,10 @@ public:
             if (AggregateFunctionFactory::instance().isAggregateFunctionName(function->getFunctionName()))
                 ++aggregate_functions_counter;
 
-            if (isNameOfInFunction(function->getFunctionName()))
+            if (functionHasSubqueryArgument(function))
             {
-                ++in_function_instance_counter;
-                in_function_instance_stack.push_back(in_function_instance_counter);
+                ++subquery_function_instance_counter;
+                subquery_function_instance_stack.push_back(subquery_function_instance_counter);
             }
         }
 
@@ -55,8 +55,8 @@ public:
             if (AggregateFunctionFactory::instance().isAggregateFunctionName(function->getFunctionName()))
                 --aggregate_functions_counter;
 
-            if (isNameOfInFunction(function->getFunctionName()))
-                in_function_instance_stack.pop_back();
+            if (functionHasSubqueryArgument(function))
+                subquery_function_instance_stack.pop_back();
         }
 
         expressions.pop_back();
@@ -89,11 +89,11 @@ public:
         return aggregate_functions_counter > 0;
     }
 
-    size_t getInFunctionInstanceId() const
+    size_t getSubqueryFunctionInstanceId() const
     {
-        if (in_function_instance_stack.empty())
+        if (subquery_function_instance_stack.empty())
             return 0;
-        return in_function_instance_stack.back();
+        return subquery_function_instance_stack.back();
     }
 
     QueryTreeNodePtr getExpressionWithAlias(const std::string & alias) const
@@ -146,10 +146,18 @@ public:
     }
 
 private:
+    static bool functionHasSubqueryArgument(const FunctionNode * function)
+    {
+        for (const auto & arg : function->getArguments().getNodes())
+            if (arg && isSubqueryNodeType(arg->getNodeType()))
+                return true;
+        return false;
+    }
+
     QueryTreeNodes expressions;
     size_t aggregate_functions_counter = 0;
-    size_t in_function_instance_counter = 0;
-    std::vector<size_t> in_function_instance_stack;
+    size_t subquery_function_instance_counter = 0;
+    std::vector<size_t> subquery_function_instance_stack;
     std::unordered_map<std::string, QueryTreeNodes> alias_name_to_expressions;
 };
 
