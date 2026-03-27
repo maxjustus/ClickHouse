@@ -45,7 +45,7 @@ struct IdentifierLookup
     Identifier identifier;
     IdentifierLookupContext lookup_context;
     ASTPtr original_ast_node = nullptr;
-    size_t in_function_instance_id = 0;
+    size_t subquery_function_instance_id = 0;
 
     bool isExpressionLookup() const
     {
@@ -72,7 +72,7 @@ inline bool operator==(const IdentifierLookup & lhs, const IdentifierLookup & rh
 {
     return lhs.identifier.getFullName() == rhs.identifier.getFullName()
         && lhs.lookup_context == rhs.lookup_context
-        && lhs.in_function_instance_id == rhs.in_function_instance_id;
+        && lhs.subquery_function_instance_id == rhs.subquery_function_instance_id;
 }
 
 [[maybe_unused]] inline bool operator!=(const IdentifierLookup & lhs, const IdentifierLookup & rhs)
@@ -86,8 +86,8 @@ struct IdentifierLookupHash
     {
         size_t hash = std::hash<std::string>()(identifier_lookup.identifier.getFullName())
             ^ static_cast<uint8_t>(identifier_lookup.lookup_context);
-        if (identifier_lookup.in_function_instance_id != 0)
-            hash ^= std::hash<size_t>()(identifier_lookup.in_function_instance_id) * 2654435761ULL;
+        if (identifier_lookup.subquery_function_instance_id != 0)
+            hash ^= std::hash<size_t>()(identifier_lookup.subquery_function_instance_id) * 2654435761ULL;
         return hash;
     }
 };
