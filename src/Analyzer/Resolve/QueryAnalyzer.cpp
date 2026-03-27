@@ -1356,7 +1356,7 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     IdentifierResolveContext identifier_resolve_context)
 {
     IdentifierLookup cache_lookup = identifier_lookup;
-    cache_lookup.in_function_instance_id = scope.expressions_in_resolve_process_stack.getInFunctionInstanceId();
+    cache_lookup.subquery_function_instance_id = scope.expressions_in_resolve_process_stack.getSubqueryFunctionInstanceId();
 
     auto it = scope.identifier_in_lookup_process.find(cache_lookup);
 
