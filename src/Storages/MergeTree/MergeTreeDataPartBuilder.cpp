@@ -2,6 +2,7 @@
 #include <Storages/MergeTree/MergeTreeDataPartCompact.h>
 #include <Storages/MergeTree/MergeTreeDataPartWide.h>
 #include <Storages/MergeTree/DataPartStorageOnDiskFull.h>
+#include <Storages/MergeTree/DataPartStorageOnDiskPacked.h>
 #include <Storages/MergeTree/MergeTreeData.h>
 
 namespace DB
@@ -87,6 +88,8 @@ MutableDataPartStoragePtr MergeTreeDataPartBuilder::getPartStorageByType(
     {
         case Type::Full:
             return std::make_shared<DataPartStorageOnDiskFull>(volume_, root_path_, part_dir_);
+        case Type::Packed:
+            return std::make_shared<DataPartStorageOnDiskPacked>(volume_, root_path_, part_dir_);
         default:
             throw Exception(ErrorCodes::UNKNOWN_PART_TYPE,
                 "Unknown type of storage for part {}", fs::path(root_path_) / part_dir_);
@@ -141,6 +144,14 @@ MergeTreeDataPartBuilder::getPartStorageAndMarkType(
 {
     auto disk = volume_->getDisk();
     auto part_relative_path = fs::path(root_path_) / part_dir_;
+
+    /// Detect packed storage by the presence of data.packed file.
+    if (disk->existsFile(part_relative_path / DataPartStorageOnDiskPacked::PACKED_FILE_NAME))
+    {
+        auto storage = getPartStorageByType(MergeTreeDataPartStorageType::Packed, volume_, root_path_, part_dir_, read_settings_);
+        auto mark_type = MergeTreeIndexGranularityInfo::getMarksTypeFromFilesystem(*storage);
+        return {std::move(storage), mark_type};
+    }
 
     for (auto it = disk->iterateDirectory(part_relative_path); it->isValid(); it->next())
     {

@@ -232,6 +232,7 @@ namespace MergeTreeSetting
     extern const MergeTreeSettingsString disk;
     extern const MergeTreeSettingsBool table_disk;
     extern const MergeTreeSettingsBool enable_mixed_granularity_parts;
+    extern const MergeTreeSettingsBool enable_packed_part_storage;
     extern const MergeTreeSettingsBool escape_index_filenames;
     extern const MergeTreeSettingsBool fsync_after_insert;
     extern const MergeTreeSettingsBool fsync_part_directory;
@@ -4837,7 +4838,11 @@ MergeTreeDataPartFormat MergeTreeData::choosePartFormat(
     if (satisfies((*settings)[MergeTreeSetting::min_bytes_for_wide_part], (*settings)[MergeTreeSetting::min_rows_for_wide_part], (*settings)[MergeTreeSetting::min_level_for_wide_part]))
         part_type = PartType::Compact;
 
-    return {part_type, PartStorageType::Full};
+    auto storage_type = PartStorageType::Full;
+    if ((*settings)[MergeTreeSetting::enable_packed_part_storage])
+        storage_type = PartStorageType::Packed;
+
+    return {part_type, storage_type};
 }
 
 MergeTreeDataPartBuilder MergeTreeData::getDataPartBuilder(

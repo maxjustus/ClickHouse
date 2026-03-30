@@ -82,6 +82,11 @@ namespace ErrorCodes
     DECLARE(UInt64, min_rows_for_wide_part, 0, R"(
     Minimal number of rows to create a data part in `Wide` format instead of `Compact`.
     )", 0) \
+    DECLARE(Bool, enable_packed_part_storage, false, R"(
+    When enabled, all files within a data part are packed into a single `data.packed`
+    archive file instead of being stored as separate files. This reduces the number of
+    objects on remote storage (e.g. S3) from O(columns) to O(1) per part.
+    )", 0) \
     DECLARE(UInt64, max_merge_delayed_streams_for_parallel_write, 40, R"(
     The maximum number of streams (columns) that can be flushed in parallel
     (analog of max_insert_delayed_streams_for_parallel_write for merges). Works
@@ -2799,6 +2804,7 @@ void MergeTreeSettings::checkCanSet(std::string_view name, const Field & value)
 
 bool MergeTreeSettings::isPartFormatSetting(const String & name)
 {
-    return name == "min_bytes_for_wide_part" || name == "min_rows_for_wide_part" || name == "min_level_for_wide_part";
+    return name == "min_bytes_for_wide_part" || name == "min_rows_for_wide_part"
+        || name == "min_level_for_wide_part" || name == "enable_packed_part_storage";
 }
 }
