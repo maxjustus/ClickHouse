@@ -1791,10 +1791,12 @@ void Aggregator::writeToTemporaryFile(AggregatedDataVariants & data_variants, si
     else
         throw Exception(ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT, "Unknown aggregated data variant");
 
-    /// NOTE Instead of freeing up memory and creating new hash tables and arenas, you can re-use the old ones.
+    /// Reuse aggregates_pool across spills. init() must run before clear() so the
+    /// hash table drops its raw state pointers before the arena memory is invalidated.
     data_variants.init(data_variants.type);
-    data_variants.aggregates_pools = Arenas(1, std::make_shared<Arena>());
-    data_variants.aggregates_pool = data_variants.aggregates_pools.back().get();
+    data_variants.aggregates_pools.resize(1);
+    data_variants.aggregates_pools.front()->clear();
+    data_variants.aggregates_pool = data_variants.aggregates_pools.front().get();
     if (params.overflow_row || data_variants.type == AggregatedDataVariants::Type::without_key)
     {
         AggregateDataPtr place = data_variants.aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
@@ -3584,7 +3586,7 @@ void Aggregator::mergeBlocks(BucketToBlocks bucket_to_blocks, AggregatedDataVari
 }
 
 
-Block Aggregator::mergeBlocks(BlocksList & blocks, bool final, std::atomic<bool> & is_cancelled)
+Block Aggregator::mergeBlocks(BlocksList & blocks, bool final, std::atomic<bool> & is_cancelled, Arena * arena_for_keys)
 {
     if (blocks.empty())
         return {};
@@ -3633,10 +3635,11 @@ Block Aggregator::mergeBlocks(BlocksList & blocks, bool final, std::atomic<bool>
 
     size_t source_rows = 0;
 
-    /// In some aggregation methods (e.g. serialized) aggregates pools are used also to store serialized aggregation keys.
-    /// Memory occupied by them will have the same lifetime as aggregate function states, while it is not actually necessary and leads to excessive memory consumption.
-    /// To avoid this we use a separate arena to allocate memory for aggregation keys. Its memory will be freed at this function return.
-    auto arena_for_keys = std::make_shared<Arena>();
+    /// Serialized hash-table keys live in a separate arena so their lifetime
+    /// is not tied to aggregate states. Caller may pass a reusable one.
+    Arena local_arena_for_keys;
+    if (!arena_for_keys)
+        arena_for_keys = &local_arena_for_keys;
 
     for (Block & block : blocks)
     {
@@ -3650,7 +3653,7 @@ Block Aggregator::mergeBlocks(BlocksList & blocks, bool final, std::atomic<bool>
 
 #define M(NAME, IS_TWO_LEVEL) \
     else if (result.type == AggregatedDataVariants::Type::NAME) \
-        mergeStreamsImpl(std::move(block), result.aggregates_pool, *result.NAME, result.NAME->data, nullptr, result.consecutive_keys_cache_stats, false, is_cancelled, arena_for_keys.get());
+        mergeStreamsImpl(std::move(block), result.aggregates_pool, *result.NAME, result.NAME->data, nullptr, result.consecutive_keys_cache_stats, false, is_cancelled, arena_for_keys);
 
         APPLY_FOR_AGGREGATED_VARIANTS(M)
     #undef M

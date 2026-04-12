@@ -341,6 +341,21 @@ public:
         return res;
     }
 
+    /// Release all but the most recently allocated MemoryChunk and rewind its
+    /// write position. All pointers previously returned by alloc/alignedAlloc
+    /// are invalidated; the caller must guarantee no live references remain.
+    void clear()
+    {
+        head.prev.reset();
+        used_bytes = 0;
+        allocated_bytes = 0;
+        if (head.empty())
+            return;
+        ASAN_POISON_MEMORY_REGION(head.begin, head.size());
+        head.pos = head.begin;
+        allocated_bytes = head.size();
+    }
+
     /// Size of all MemoryChunks in bytes.
     size_t allocatedBytes() const { return allocated_bytes; }
 

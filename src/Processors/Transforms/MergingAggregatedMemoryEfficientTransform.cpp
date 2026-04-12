@@ -388,7 +388,8 @@ void MergingAggregatedBucketTransform::transform(Chunk & chunk)
     res_info->chunk_num = chunks_to_merge->chunk_num;
     chunk.getChunkInfos().add(std::move(res_info));
 
-    auto block = params->aggregator.mergeBlocks(blocks_list, params->final, is_cancelled);
+    merge_keys_arena.clear();
+    auto block = params->aggregator.mergeBlocks(blocks_list, params->final, is_cancelled, &merge_keys_arena);
 
     if (!required_sort_description.empty())
         sortBlock(block, required_sort_description);

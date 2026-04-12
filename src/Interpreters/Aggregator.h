@@ -265,7 +265,13 @@ public:
     /// Precondition: for all blocks block.info.is_overflows flag must be the same.
     /// (either all blocks are from overflow data or none blocks are).
     /// The resulting block has the same value of is_overflows flag.
-    Block mergeBlocks(BlocksList & blocks, bool final, std::atomic<bool> & is_cancelled);
+    ///
+    /// `arena_for_keys` (optional) is used for serialized hash-table keys; the
+    /// caller must clear it between calls. The aggregate-state arena is owned
+    /// by mergeBlocks because the result block may alias it via
+    /// ColumnAggregateFunction and outlive the call via downstream buffering.
+    Block mergeBlocks(BlocksList & blocks, bool final, std::atomic<bool> & is_cancelled,
+                      Arena * arena_for_keys = nullptr);
 
     /** Split block with partially-aggregated data to many blocks, as if two-level method of aggregation was used.
       * This is needed to simplify merging of that data with other results, that are already two-level.

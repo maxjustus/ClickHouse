@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Common/Arena.h>
 #include <Core/SortDescription.h>
 #include <Interpreters/Aggregator.h>
 #include <Processors/Chunk.h>
@@ -120,6 +121,9 @@ protected:
 private:
     AggregatingTransformParamsPtr params;
     const SortDescription required_sort_description;
+    /// Reused across bucket merges so the per-call key arena bootstrap happens once
+    /// per thread instead of once per bucket. Cleared at the start of each transform().
+    Arena merge_keys_arena;
 };
 
 /// Has several inputs and single output.
