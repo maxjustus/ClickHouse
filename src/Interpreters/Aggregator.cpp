@@ -1779,6 +1779,10 @@ void Aggregator::writeToTemporaryFile(AggregatedDataVariants & data_variants, si
 
     LOG_DEBUG(log, "Writing part of aggregation data into temporary file {}", out_stream.getHolder()->describeFilePath());
 
+    /// Spill serialization clears/shrinks the two-level tables while materializing
+    /// blocks, so snapshot the previous spill cardinality before dispatching into it.
+    auto rows_hint = data_variants.sizeWithoutOverflowRow();
+
     /// Flush only two-level data and possibly overflow data.
 
 #define M(NAME) \
@@ -1791,9 +1795,12 @@ void Aggregator::writeToTemporaryFile(AggregatedDataVariants & data_variants, si
     else
         throw Exception(ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT, "Unknown aggregated data variant");
 
+    /// Pre-size the new hash table from the previous spill's cardinality so it
+    /// allocates at the right capacity instead of growing through the doubling sequence.
+    data_variants.init(data_variants.type, rows_hint);
+
     /// Reuse aggregates_pool across spills. init() must run before clear() so the
     /// hash table drops its raw state pointers before the arena memory is invalidated.
-    data_variants.init(data_variants.type);
     data_variants.aggregates_pools.resize(1);
     data_variants.aggregates_pools.front()->clear();
     data_variants.aggregates_pool = data_variants.aggregates_pools.front().get();
