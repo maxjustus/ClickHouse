@@ -1536,6 +1536,13 @@ Split parts ranges into intersecting and non intersecting during FINAL optimizat
     DECLARE(Bool, split_intersecting_parts_ranges_into_layers_final, true, R"(
 Split intersecting parts ranges into layers during FINAL optimization
 )", 0) \
+    DECLARE(UInt64, merge_tree_final_layers_per_stream, 1, R"(
+Number of PK-range merge layers packed into each parallel FINAL stream.
+
+When greater than `1`, `PartsSplitter` produces `num_streams * merge_tree_final_layers_per_stream` layers per partition instead of `num_streams`, and consecutive layers are grouped into `num_streams` buckets. Each bucket exposes one output port and activates its layers sequentially (one at a time), so only one layer per stream holds its merge-initialization chunks in memory at once. Peak FINAL memory drops proportionally to this value while downstream parallelism is preserved.
+
+Value `1` disables bucketing and matches the pre-change behavior exactly.
+)", 0) \
     DECLARE(Bool, apply_row_policy_after_final, true, R"(
 When enabled, row policies and PREWHERE are applied after FINAL processing for *MergeTree tables. (Especially for ReplacingMergeTree)
 When disabled, row policies are applied before FINAL, which can cause different results when the policy

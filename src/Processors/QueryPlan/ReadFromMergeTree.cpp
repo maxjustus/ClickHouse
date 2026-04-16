@@ -21,6 +21,7 @@
 #include <Processors/Merges/AggregatingSortedTransform.h>
 #include <Processors/Merges/CoalescingSortedTransform.h>
 #include <Processors/Merges/CollapsingSortedTransform.h>
+#include <Processors/Merges/FinalLayerChain.h>
 #include <Processors/Merges/GraphiteRollupSortedTransform.h>
 #include <Processors/Merges/MergingSortedTransform.h>
 #include <Processors/Merges/ReplacingSortedTransform.h>
@@ -201,6 +202,7 @@ namespace Setting
     extern const SettingsUInt64 read_in_order_two_level_merge_threshold;
     extern const SettingsBool split_parts_ranges_into_intersecting_and_non_intersecting_final;
     extern const SettingsBool split_intersecting_parts_ranges_into_layers_final;
+    extern const SettingsUInt64 merge_tree_final_layers_per_stream;
     extern const SettingsBool use_primary_key;
     extern const SettingsBool use_partition_pruning;
     extern const SettingsBool use_skip_indexes;
@@ -1704,6 +1706,7 @@ Pipe ReadFromMergeTree::spreadMarkRangesAmongStreamsFinal(
         }
 
         Pipes pipes;
+        size_t base_max_layers = 0; /// The port count a `layers_per_stream = 1` run would have produced.
         {
             RangesInDataParts new_parts;
             size_t current_ranges_marks = 0;
@@ -1724,7 +1727,14 @@ Pipe ReadFromMergeTree::spreadMarkRangesAmongStreamsFinal(
 
             /// Maximal number of streams could be very small compared to the number of parts. It gets even worse when we split those parts further.
             /// To not produce too many layers, i.e., to wide pipeline, let's limit the number of streams proportionally to the total number of marks in parts.
-            const size_t max_layers = std::max<size_t>((num_streams * current_ranges_marks) / total_marks_to_read, 1);
+            ///
+            /// `merge_tree_final_layers_per_stream` > 1 requests finer-grained PK splitting so that
+            /// consecutive layers can be bucketed and read sequentially below, bounding the per-stream
+            /// merge-initialization memory cost. At value 1 this is a no-op (identical layer count).
+            const size_t layers_per_stream = std::max<size_t>(settings[Setting::merge_tree_final_layers_per_stream], 1);
+            base_max_layers = std::max<size_t>(
+                (num_streams * current_ranges_marks) / total_marks_to_read, 1);
+            const size_t max_layers = base_max_layers * layers_per_stream;
 
             if (storage_snapshot->metadata->hasPrimaryKey())
             {
@@ -1814,7 +1824,60 @@ Pipe ReadFromMergeTree::spreadMarkRangesAmongStreamsFinal(
                 block_size.max_block_size_rows,
                 enable_vertical_final);
 
-        merging_pipes.emplace_back(Pipe::unitePipes(std::move(pipes)));
+        /// Target exactly `base_max_layers` output ports per partition — identical to what a
+        /// `merge_tree_final_layers_per_stream = 1` run would have produced. If `PartsSplitter` returned
+        /// fewer layers than that (because part layout doesn't support further splitting), skip
+        /// bucketing and emit the pipes as-is — downstream parallelism is unchanged and there would
+        /// be nothing to hide behind a chain anyway.
+        const size_t num_buckets = std::min(pipes.size(), base_max_layers);
+        if (num_buckets >= pipes.size())
+        {
+            merging_pipes.emplace_back(Pipe::unitePipes(std::move(pipes)));
+        }
+        else
+        {
+            /// Distribute `pipes.size()` contiguous (non-overlapping PK-range) layers into `num_buckets`
+            /// buckets. Buckets receive `base_size` layers each, with the first `extras` buckets taking
+            /// one additional layer. Each bucket with more than one layer is wrapped in a `FinalLayerChain`
+            /// that keeps only the first layer connected and activates the rest sequentially.
+            Pipes bucketed;
+            bucketed.reserve(num_buckets);
+
+            const size_t base_size = pipes.size() / num_buckets;
+            const size_t extras = pipes.size() % num_buckets;
+
+            size_t cursor = 0;
+            for (size_t b = 0; b < num_buckets; ++b)
+            {
+                const size_t bucket_size = base_size + (b < extras ? 1 : 0);
+
+                if (bucket_size == 1)
+                {
+                    bucketed.emplace_back(std::move(pipes[cursor]));
+                    cursor += 1;
+                    continue;
+                }
+
+                std::vector<FinalLayerChain::PendingLayer> pending;
+                pending.reserve(bucket_size - 1);
+                for (size_t i = 1; i < bucket_size; ++i)
+                {
+                    auto & layer_pipe = pipes[cursor + i];
+                    OutputPort * terminal_out = layer_pipe.getOutputPort(0);
+                    Processors procs = Pipe::detachProcessors(std::move(layer_pipe));
+                    pending.push_back({std::move(procs), terminal_out});
+                }
+
+                auto chain = std::make_shared<FinalLayerChain>(
+                    pipes[cursor].getSharedHeader(), std::move(pending));
+                pipes[cursor].addTransform(std::move(chain));
+                bucketed.emplace_back(std::move(pipes[cursor]));
+
+                cursor += bucket_size;
+            }
+
+            merging_pipes.emplace_back(Pipe::unitePipes(std::move(bucketed)));
+        }
     }
 
     if (!non_intersecting_parts_by_primary_key.empty())
