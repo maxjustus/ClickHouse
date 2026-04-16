@@ -1539,7 +1539,9 @@ Split intersecting parts ranges into layers during FINAL optimization
     DECLARE(UInt64, merge_tree_final_layers_per_stream, 1, R"(
 Number of PK-range merge layers packed into each parallel FINAL stream.
 
-When greater than `1`, `PartsSplitter` produces `num_streams * merge_tree_final_layers_per_stream` layers per partition instead of `num_streams`, and consecutive layers are grouped into `num_streams` buckets. Each bucket exposes one output port and activates its layers sequentially (one at a time), so only one layer per stream holds its merge-initialization chunks in memory at once. Peak FINAL memory drops proportionally to this value while downstream parallelism is preserved.
+When greater than `1`, `PartsSplitter` produces `num_streams * merge_tree_final_layers_per_stream` layers per partition instead of `num_streams`, and consecutive layers are grouped into `num_streams` buckets. Each bucket exposes one output port and activates its layers sequentially (one at a time), so only one layer per stream holds its merge-initialization chunks in memory at once. Peak FINAL memory drops while downstream parallelism is preserved.
+
+Memory savings plateau and eventually regress as the value grows: very high values create many small layers whose per-layer fixed overhead (reader construction, pipe wiring, merge-algorithm state) outweighs the saved init chunks. A good operating range is `2..8`; the optimum depends on parts-per-partition and `max_final_threads`. Benchmark your workload before setting this above `1`.
 
 Value `1` disables bucketing and matches the pre-change behavior exactly.
 )", 0) \
