@@ -203,6 +203,7 @@ namespace Setting
     extern const SettingsBool split_parts_ranges_into_intersecting_and_non_intersecting_final;
     extern const SettingsBool split_intersecting_parts_ranges_into_layers_final;
     extern const SettingsUInt64 merge_tree_final_layers_per_stream;
+    extern const SettingsUInt64 merge_tree_final_partitions_per_stream;
     extern const SettingsBool use_primary_key;
     extern const SettingsBool use_partition_pruning;
     extern const SettingsBool use_skip_indexes;
@@ -1564,6 +1565,61 @@ static void addMergingFinal(
                                 { return std::make_shared<SelectByIndicesTransform>(header_); });
 }
 
+/// Distribute `pipes` into `num_buckets` contiguous groups. Multi-element groups are wrapped in a
+/// `FinalLayerChain` so only the first pipe in each group is initially connected to the executor;
+/// subsequent ones are activated by the chain when the active input finishes. Returns one pipe per
+/// bucket. No-op (pass-through) when `num_buckets >= pipes.size()`. Every input pipe must have
+/// exactly one output port.
+static Pipes bucketIntoFinalLayerChains(Pipes && pipes, size_t num_buckets)
+{
+    if (num_buckets >= pipes.size() || num_buckets == 0)
+    {
+        Pipes out;
+        out.reserve(pipes.size());
+        for (auto & pipe : pipes)
+            out.emplace_back(std::move(pipe));
+        return out;
+    }
+
+    Pipes bucketed;
+    bucketed.reserve(num_buckets);
+
+    const size_t base_size = pipes.size() / num_buckets;
+    const size_t extras = pipes.size() % num_buckets;
+
+    size_t cursor = 0;
+    for (size_t b = 0; b < num_buckets; ++b)
+    {
+        const size_t bucket_size = base_size + (b < extras ? 1 : 0);
+
+        if (bucket_size == 1)
+        {
+            bucketed.emplace_back(std::move(pipes[cursor]));
+            cursor += 1;
+            continue;
+        }
+
+        std::vector<FinalLayerChain::PendingLayer> pending;
+        pending.reserve(bucket_size - 1);
+        for (size_t i = 1; i < bucket_size; ++i)
+        {
+            auto & source_pipe = pipes[cursor + i];
+            OutputPort * terminal_out = source_pipe.getOutputPort(0);
+            Processors procs = Pipe::detachProcessors(std::move(source_pipe));
+            pending.push_back({std::move(procs), terminal_out});
+        }
+
+        auto chain = std::make_shared<FinalLayerChain>(
+            pipes[cursor].getSharedHeader(), std::move(pending));
+        pipes[cursor].addTransform(std::move(chain));
+        bucketed.emplace_back(std::move(pipes[cursor]));
+
+        cursor += bucket_size;
+    }
+
+    return bucketed;
+}
+
 static std::pair<std::shared_ptr<ExpressionActions>, String> createExpressionForPositiveSign(const String & sign_column_name, const Block & header, const ContextPtr & context)
 {
     ASTPtr sign_indentifier = make_intrusive<ASTIdentifier>(sign_column_name);
@@ -1825,59 +1881,28 @@ Pipe ReadFromMergeTree::spreadMarkRangesAmongStreamsFinal(
                 enable_vertical_final);
 
         /// Target exactly `base_max_layers` output ports per partition — identical to what a
-        /// `merge_tree_final_layers_per_stream = 1` run would have produced. If `PartsSplitter` returned
-        /// fewer layers than that (because part layout doesn't support further splitting), skip
-        /// bucketing and emit the pipes as-is — downstream parallelism is unchanged and there would
-        /// be nothing to hide behind a chain anyway.
-        const size_t num_buckets = std::min(pipes.size(), base_max_layers);
-        if (num_buckets >= pipes.size())
-        {
-            merging_pipes.emplace_back(Pipe::unitePipes(std::move(pipes)));
-        }
-        else
-        {
-            /// Distribute `pipes.size()` contiguous (non-overlapping PK-range) layers into `num_buckets`
-            /// buckets. Buckets receive `base_size` layers each, with the first `extras` buckets taking
-            /// one additional layer. Each bucket with more than one layer is wrapped in a `FinalLayerChain`
-            /// that keeps only the first layer connected and activates the rest sequentially.
-            Pipes bucketed;
-            bucketed.reserve(num_buckets);
+        /// `merge_tree_final_layers_per_stream = 1` run would have produced. If `PartsSplitter`
+        /// returned fewer layers than that, the helper short-circuits and emits the pipes as-is.
+        const size_t layer_buckets = std::min(pipes.size(), base_max_layers);
+        Pipes bucketed = bucketIntoFinalLayerChains(std::move(pipes), layer_buckets);
+        merging_pipes.emplace_back(Pipe::unitePipes(std::move(bucketed)));
+    }
 
-            const size_t base_size = pipes.size() / num_buckets;
-            const size_t extras = pipes.size() % num_buckets;
+    /// Cross-partition layer chain: bucket `merging_pipes` entries (one per partition) into groups
+    /// and activate partitions within a group sequentially. Only meaningful when
+    /// `do_not_merge_across_partitions_select_final` kept partitions separate — otherwise
+    /// `merging_pipes` has a single element and the setting is a no-op.
+    const size_t partitions_per_stream = std::max<size_t>(settings[Setting::merge_tree_final_partitions_per_stream], 1);
+    if (partitions_per_stream > 1 && merging_pipes.size() > 1)
+    {
+        /// Flatten each partition to a single output port so the chain can swap whole partitions
+        /// in and out by replacing one input connection. `Pipe::resize(1)` is a no-op on partitions
+        /// that are already single-port.
+        for (auto & partition_pipe : merging_pipes)
+            partition_pipe.resize(1);
 
-            size_t cursor = 0;
-            for (size_t b = 0; b < num_buckets; ++b)
-            {
-                const size_t bucket_size = base_size + (b < extras ? 1 : 0);
-
-                if (bucket_size == 1)
-                {
-                    bucketed.emplace_back(std::move(pipes[cursor]));
-                    cursor += 1;
-                    continue;
-                }
-
-                std::vector<FinalLayerChain::PendingLayer> pending;
-                pending.reserve(bucket_size - 1);
-                for (size_t i = 1; i < bucket_size; ++i)
-                {
-                    auto & layer_pipe = pipes[cursor + i];
-                    OutputPort * terminal_out = layer_pipe.getOutputPort(0);
-                    Processors procs = Pipe::detachProcessors(std::move(layer_pipe));
-                    pending.push_back({std::move(procs), terminal_out});
-                }
-
-                auto chain = std::make_shared<FinalLayerChain>(
-                    pipes[cursor].getSharedHeader(), std::move(pending));
-                pipes[cursor].addTransform(std::move(chain));
-                bucketed.emplace_back(std::move(pipes[cursor]));
-
-                cursor += bucket_size;
-            }
-
-            merging_pipes.emplace_back(Pipe::unitePipes(std::move(bucketed)));
-        }
+        const size_t num_buckets = (merging_pipes.size() + partitions_per_stream - 1) / partitions_per_stream;
+        merging_pipes = bucketIntoFinalLayerChains(std::move(merging_pipes), num_buckets);
     }
 
     if (!non_intersecting_parts_by_primary_key.empty())

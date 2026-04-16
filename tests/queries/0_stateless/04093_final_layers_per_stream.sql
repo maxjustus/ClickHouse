@@ -75,6 +75,38 @@ WITH
 SELECT 'Chain', (h1 = h2) AND (h2 = h4) AND (h4 = h8);
 DROP TABLE t_final_chain;
 
+-- Cross-partition chain: ReplacingMergeTree with a partition key producing several partitions,
+-- do_not_merge_across_partitions_select_final keeps them independent so merging_pipes has
+-- one entry per partition that the chain can bucket.
+DROP TABLE IF EXISTS t_final_cross;
+CREATE TABLE t_final_cross (p UInt32, k UInt32, v UInt32, ver UInt32)
+ENGINE = ReplacingMergeTree(ver) PARTITION BY p ORDER BY k;
+SYSTEM STOP MERGES t_final_cross;
+INSERT INTO t_final_cross SELECT 0, number, number + 10, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 0, number, number + 11, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 1, number, number + 20, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 1, number, number + 21, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 2, number, number + 30, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 2, number, number + 31, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 3, number, number + 40, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 3, number, number + 41, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 4, number, number + 50, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 4, number, number + 51, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 5, number, number + 60, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 5, number, number + 61, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 6, number, number + 70, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 6, number, number + 71, 2 FROM numbers(500, 1000);
+INSERT INTO t_final_cross SELECT 7, number, number + 80, 1 FROM numbers(1000);
+INSERT INTO t_final_cross SELECT 7, number, number + 81, 2 FROM numbers(500, 1000);
+WITH
+    (SELECT cityHash64(groupArray(tuple(p, k, v, ver))) FROM (SELECT p, k, v, ver FROM t_final_cross FINAL ORDER BY p, k SETTINGS merge_tree_final_partitions_per_stream = 1, merge_tree_final_layers_per_stream = 1, do_not_merge_across_partitions_select_final = 1, max_final_threads = 4)) AS h_1_1,
+    (SELECT cityHash64(groupArray(tuple(p, k, v, ver))) FROM (SELECT p, k, v, ver FROM t_final_cross FINAL ORDER BY p, k SETTINGS merge_tree_final_partitions_per_stream = 2, merge_tree_final_layers_per_stream = 1, do_not_merge_across_partitions_select_final = 1, max_final_threads = 4)) AS h_2_1,
+    (SELECT cityHash64(groupArray(tuple(p, k, v, ver))) FROM (SELECT p, k, v, ver FROM t_final_cross FINAL ORDER BY p, k SETTINGS merge_tree_final_partitions_per_stream = 4, merge_tree_final_layers_per_stream = 1, do_not_merge_across_partitions_select_final = 1, max_final_threads = 4)) AS h_4_1,
+    (SELECT cityHash64(groupArray(tuple(p, k, v, ver))) FROM (SELECT p, k, v, ver FROM t_final_cross FINAL ORDER BY p, k SETTINGS merge_tree_final_partitions_per_stream = 8, merge_tree_final_layers_per_stream = 1, do_not_merge_across_partitions_select_final = 1, max_final_threads = 4)) AS h_8_1,
+    (SELECT cityHash64(groupArray(tuple(p, k, v, ver))) FROM (SELECT p, k, v, ver FROM t_final_cross FINAL ORDER BY p, k SETTINGS merge_tree_final_partitions_per_stream = 4, merge_tree_final_layers_per_stream = 2, do_not_merge_across_partitions_select_final = 1, max_final_threads = 2)) AS h_4_2
+SELECT 'Cross', (h_1_1 = h_2_1) AND (h_2_1 = h_4_1) AND (h_4_1 = h_8_1) AND (h_8_1 = h_4_2);
+DROP TABLE t_final_cross;
+
 -- AggregatingMergeTree with a SimpleAggregateFunction
 DROP TABLE IF EXISTS t_final_aggregating;
 CREATE TABLE t_final_aggregating (k UInt32, v SimpleAggregateFunction(sum, UInt64)) ENGINE = AggregatingMergeTree ORDER BY k;

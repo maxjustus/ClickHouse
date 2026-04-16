@@ -1536,6 +1536,17 @@ Split parts ranges into intersecting and non intersecting during FINAL optimizat
     DECLARE(Bool, split_intersecting_parts_ranges_into_layers_final, true, R"(
 Split intersecting parts ranges into layers during FINAL optimization
 )", 0) \
+    DECLARE(UInt64, merge_tree_final_partitions_per_stream, 1, R"(
+Number of partitions chained sequentially into each parallel FINAL stream when `do_not_merge_across_partitions_select_final` keeps partition merges independent.
+
+When greater than `1`, partition pipes are grouped into `ceil(partitions / merge_tree_final_partitions_per_stream)` buckets; each multi-partition bucket is wrapped in a `FinalLayerChain` that keeps only the first partition's merge connected to the executor and activates the next one when the active one finishes. Peak FINAL memory drops by roughly this factor on queries that touch many partitions.
+
+Side effect: to let the chain accept one partition at a time, each partition's multi-port output (if the intra-partition `merge_tree_final_layers_per_stream` produced more than one port) is first flattened with a `ResizeProcessor`. If per-partition parallelism matters for your workload, tune `merge_tree_final_layers_per_stream` first and leave this at `1`.
+
+Setting is a no-op when only one partition participates in the merge (e.g. when `do_not_merge_across_partitions_select_final = 0`, which is the default).
+
+Value `1` disables cross-partition bucketing.
+)", 0) \
     DECLARE(UInt64, merge_tree_final_layers_per_stream, 1, R"(
 Number of PK-range merge layers packed into each parallel FINAL stream.
 
