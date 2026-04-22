@@ -28,10 +28,10 @@ namespace
 {
 
 class OptimizeDateOrDateTimeConverterWithPreimageVisitor
-    : public InDepthQueryTreeVisitorWithContext<OptimizeDateOrDateTimeConverterWithPreimageVisitor>
+    : public InDepthQueryTreeVisitorWithContext<OptimizeDateOrDateTimeConverterWithPreimageVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<OptimizeDateOrDateTimeConverterWithPreimageVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<OptimizeDateOrDateTimeConverterWithPreimageVisitor, true /*memoize_by_pointer*/>;
 
     explicit OptimizeDateOrDateTimeConverterWithPreimageVisitor(ContextPtr context) : Base(std::move(context)) { }
 

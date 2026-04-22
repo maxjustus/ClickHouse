@@ -93,10 +93,10 @@ void getJoinNodes(QueryTreeNodePtr & join_tree_node, std::vector<JoinNode *> & j
     getJoinNodes(join_node->getRightTableExpression(), join_nodes);
 }
 
-class CrossToInnerJoinVisitor : public InDepthQueryTreeVisitorWithContext<CrossToInnerJoinVisitor>
+class CrossToInnerJoinVisitor : public InDepthQueryTreeVisitorWithContext<CrossToInnerJoinVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<CrossToInnerJoinVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<CrossToInnerJoinVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     /// The graph for cross join.
