@@ -19,9 +19,9 @@ FROM ( SELECT 1 as val )
 SETTINGS enable_analyzer = 1
 ;
 
--- Analyzer detects forward alias references in cyclic patterns as UNKNOWN_IDENTIFIER
+-- Analyzer detects forward alias references in cyclic patterns
 SELECT x + 1 AS y, y + 1 AS x
-; -- { serverError UNKNOWN_IDENTIFIER }
+; -- { serverError UNKNOWN_IDENTIFIER, CYCLIC_ALIASES }
 
 
 SELECT
