@@ -165,74 +165,157 @@ bool IQueryTreeNode::isEqual(const IQueryTreeNode & rhs, CompareOptions compare_
     return true;
 }
 
+/// Compute tree hash using a Merkle scheme: each node's hash depends on its
+/// content plus the hashes of its children.  Shared subtrees (produced by the
+/// alias-result cache) are hashed once and the result is reused via a
+/// pointer-keyed memo table, turning an exponential DAG walk into a linear one.
+///
+/// Uses iterative post-order traversal to avoid stack overflow on deep trees.
 IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options) const
 {
-    /** Compute tree hash with this node as root.
-      *
-      * Some nodes can contain weak pointers to other nodes. Such weak nodes are not necessary
-      * part of tree that we try to hash, but we need to update hash state with their content.
-      *
-      * Algorithm
-      * For each node in tree we update hash state with their content.
-      * For weak nodes there is special handling. If we visit weak node first time we update hash state with weak node content and register
-      * identifier for this node, for subsequent visits of this weak node we hash weak node identifier instead of content.
-      */
-    HashState hash_state;
+    HashMap<const IQueryTreeNode *, Hash> strong_memo;
+    HashMap<const IQueryTreeNode *, size_t> weak_node_to_identifier;
 
-    std::unordered_map<const IQueryTreeNode *, size_t> weak_node_to_identifier;
+    enum class Phase : uint8_t { ENTER, CHILDREN_DONE };
 
-    std::vector<std::pair<const IQueryTreeNode *, bool>> nodes_to_process;
-    nodes_to_process.emplace_back(this, false);
-
-    while (!nodes_to_process.empty())
+    struct Frame
     {
-        const auto [node_to_process, is_weak_node] = nodes_to_process.back();
-        nodes_to_process.pop_back();
+        const IQueryTreeNode * node;
+        bool is_weak;
+        Phase phase;
+        /// Resolved weak pointer kept alive for the child currently being processed.
+        QueryTreeNodePtr held_weak_child;
+    };
 
-        if (is_weak_node)
+    std::vector<Frame> stack;
+    stack.push_back({this, false, Phase::ENTER, {}});
+
+    /// Collects child hashes for the current parent.  Each time a child
+    /// completes, its Hash is pushed here.  When the parent reaches
+    /// CHILDREN_DONE it pops exactly the right number of child hashes.
+    std::vector<Hash> result_stack;
+
+    while (!stack.empty())
+    {
+        auto & frame = stack.back();
+        const auto * node = frame.node;
+
+        if (frame.phase == Phase::ENTER)
         {
-            auto node_identifier_it = weak_node_to_identifier.find(node_to_process);
-            if (node_identifier_it != weak_node_to_identifier.end())
+            /// Check memos before descending.
+            if (frame.is_weak)
             {
-                hash_state.update(node_identifier_it->second);
-                continue;
+                auto * it = weak_node_to_identifier.find(node);
+                if (it)
+                {
+                    HashState h;
+                    h.update(it->getMapped());
+                    result_stack.push_back(getSipHash128AsPair(h));
+                    stack.pop_back();
+                    continue;
+                }
+                size_t new_id = weak_node_to_identifier.size();
+                decltype(weak_node_to_identifier)::LookupResult lookup;
+                bool inserted;
+                weak_node_to_identifier.emplace(node, lookup, inserted);
+                if (inserted)
+                    lookup->getMapped() = new_id;
+            }
+            else
+            {
+                auto * it = strong_memo.find(node);
+                if (it)
+                {
+                    result_stack.push_back(it->getMapped());
+                    stack.pop_back();
+                    continue;
+                }
             }
 
-            weak_node_to_identifier.emplace(node_to_process, weak_node_to_identifier.size());
+            /// Schedule children in reverse order so they execute left-to-right.
+            frame.phase = Phase::CHILDREN_DONE;
+
+            for (auto it = node->weak_pointers.rbegin(); it != node->weak_pointers.rend(); ++it)
+            {
+                auto strong_ptr = it->lock();
+                if (!strong_ptr)
+                    continue;
+                auto * raw = strong_ptr.get();
+                stack.push_back({raw, true, Phase::ENTER, std::move(strong_ptr)});
+            }
+
+            for (auto it = node->children.rbegin(); it != node->children.rend(); ++it)
+            {
+                if (*it)
+                    stack.push_back({it->get(), false, Phase::ENTER, {}});
+            }
+
+            continue;
         }
 
-        hash_state.update(static_cast<size_t>(node_to_process->getNodeType()));
-        if (compare_options.compare_aliases && !node_to_process->alias.empty())
+        /// Phase::CHILDREN_DONE — all children have completed and their
+        /// hashes are on result_stack.  Pop them and build this node's hash.
+        HashState hash_state;
+        hash_state.update(static_cast<size_t>(node->getNodeType()));
+
+        if (compare_options.compare_aliases && !node->alias.empty())
         {
-            hash_state.update(node_to_process->alias.size());
-            hash_state.update(node_to_process->alias);
+            hash_state.update(node->alias.size());
+            hash_state.update(node->alias);
         }
 
-        node_to_process->updateTreeHashImpl(hash_state, compare_options);
+        node->updateTreeHashImpl(hash_state, compare_options);
 
-        hash_state.update(node_to_process->children.size());
+        /// Count non-null strong children.
+        size_t num_strong_nonnull = 0;
+        for (const auto & child : node->children)
+            if (child)
+                ++num_strong_nonnull;
 
-        for (const auto & node_to_process_child : node_to_process->children)
+        /// Count non-null weak children.
+        size_t num_weak_nonnull = 0;
+        for (const auto & wp : node->weak_pointers)
+            if (!wp.expired())
+                ++num_weak_nonnull;
+
+        size_t total_child_hashes = num_strong_nonnull + num_weak_nonnull;
+
+        /// Pop child hashes from result_stack (they're in left-to-right order
+        /// at the top of the stack).
+        size_t first_child = result_stack.size() - total_child_hashes;
+
+        hash_state.update(node->children.size());
+        for (size_t i = 0; i < num_strong_nonnull; ++i)
         {
-            if (!node_to_process_child)
-                continue;
-
-            nodes_to_process.emplace_back(node_to_process_child.get(), false);
+            hash_state.update(result_stack[first_child + i].low64);
+            hash_state.update(result_stack[first_child + i].high64);
         }
 
-        hash_state.update(node_to_process->weak_pointers.size());
-
-        for (const auto & weak_pointer : node_to_process->weak_pointers)
+        hash_state.update(node->weak_pointers.size());
+        for (size_t i = 0; i < num_weak_nonnull; ++i)
         {
-            auto strong_pointer = weak_pointer.lock();
-            if (!strong_pointer)
-                continue;
-
-            nodes_to_process.emplace_back(strong_pointer.get(), true);
+            hash_state.update(result_stack[first_child + num_strong_nonnull + i].low64);
+            hash_state.update(result_stack[first_child + num_strong_nonnull + i].high64);
         }
+
+        result_stack.resize(first_child);
+
+        Hash result = getSipHash128AsPair(hash_state);
+
+        if (!frame.is_weak)
+        {
+            decltype(strong_memo)::LookupResult lookup;
+            bool inserted;
+            strong_memo.emplace(node, lookup, inserted);
+            if (inserted)
+                lookup->getMapped() = result;
+        }
+
+        result_stack.push_back(result);
+        stack.pop_back();
     }
 
-    return getSipHash128AsPair(hash_state);
+    return result_stack.back();
 }
 
 QueryTreeNodePtr IQueryTreeNode::clone() const
