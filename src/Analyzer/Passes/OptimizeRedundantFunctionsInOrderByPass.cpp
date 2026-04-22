@@ -20,10 +20,10 @@ namespace Setting
 namespace
 {
 
-class OptimizeRedundantFunctionsInOrderByVisitor : public InDepthQueryTreeVisitorWithContext<OptimizeRedundantFunctionsInOrderByVisitor>
+class OptimizeRedundantFunctionsInOrderByVisitor : public InDepthQueryTreeVisitorWithContext<OptimizeRedundantFunctionsInOrderByVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<OptimizeRedundantFunctionsInOrderByVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<OptimizeRedundantFunctionsInOrderByVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     static bool needChildVisit(QueryTreeNodePtr & node, QueryTreeNodePtr & /*parent*/)

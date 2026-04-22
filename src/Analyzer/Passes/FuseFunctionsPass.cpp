@@ -65,7 +65,7 @@ bool sourceHasAggregateProjections(const QueryTreeNodePtr & source, const Contex
     return false;
 }
 
-class CollectColumnSourcesVisitor : public InDepthQueryTreeVisitor<CollectColumnSourcesVisitor, true>
+class CollectColumnSourcesVisitor : public InDepthQueryTreeVisitor<CollectColumnSourcesVisitor, true /*const_visitor*/, true /*memoize_by_pointer*/>
 {
 public:
 
@@ -85,10 +85,10 @@ public:
     std::unordered_set<QueryTreeNodePtr> column_sources;
 };
 
-class FuseFunctionsVisitor : public InDepthQueryTreeVisitorWithContext<FuseFunctionsVisitor>
+class FuseFunctionsVisitor : public InDepthQueryTreeVisitorWithContext<FuseFunctionsVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<FuseFunctionsVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<FuseFunctionsVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     explicit FuseFunctionsVisitor(const std::unordered_set<String> names_to_collect_, ContextPtr context)

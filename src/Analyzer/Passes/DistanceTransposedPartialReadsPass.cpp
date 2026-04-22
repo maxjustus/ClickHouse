@@ -28,10 +28,10 @@ extern const SettingsBool optimize_qbit_distance_function_reads;
 namespace
 {
 
-class DistanceTransposedPartialReadsPassVisitor : public InDepthQueryTreeVisitorWithContext<DistanceTransposedPartialReadsPassVisitor>
+class DistanceTransposedPartialReadsPassVisitor : public InDepthQueryTreeVisitorWithContext<DistanceTransposedPartialReadsPassVisitor, true /*memoize_by_pointer*/>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<DistanceTransposedPartialReadsPassVisitor>;
+    using Base = InDepthQueryTreeVisitorWithContext<DistanceTransposedPartialReadsPassVisitor, true /*memoize_by_pointer*/>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)
