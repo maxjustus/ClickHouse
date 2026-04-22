@@ -6,8 +6,12 @@ SELECT
     val + 1 as prev,
     val + prev as val
 FROM ( SELECT 1 as val )
-SETTINGS enable_analyzer = 0 -- new analyzer resolves ambiguous aliases to alias reference.
+SETTINGS enable_analyzer = 0
 ; -- { serverError CYCLIC_ALIASES, UNKNOWN_IDENTIFIER, TOO_DEEP_RECURSION }
+
+-- Analyzer detects forward alias references in cyclic patterns as UNKNOWN_IDENTIFIER
+SELECT x + 1 AS y, y + 1 AS x
+; -- { serverError UNKNOWN_IDENTIFIER }
 
 
 SELECT
