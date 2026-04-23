@@ -31,6 +31,9 @@ IdentifierResolveScope::IdentifierResolveScope(QueryTreeNodePtr scope_node_, Ide
         context = parent_scope->context;
         projection_mask_map = parent_scope->projection_mask_map;
         global_with_aliases = parent_scope->global_with_aliases;
+
+        if (parent_scope->identifier_resolve_cache_force_disabled)
+            disableIdentifierCachePermanently();
     }
     else
         projection_mask_map = std::make_shared<std::map<IQueryTreeNode::Hash, size_t>>();
