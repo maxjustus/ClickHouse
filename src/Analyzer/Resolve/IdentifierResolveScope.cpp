@@ -1,6 +1,5 @@
 #include <Analyzer/Resolve/IdentifierResolveScope.h>
 
-#include <Analyzer/FunctionNode.h>
 #include <Analyzer/QueryNode.h>
 #include <Analyzer/UnionNode.h>
 #include <Analyzer/Utils.h>
@@ -13,7 +12,6 @@ namespace Setting
 {
     extern const SettingsBool group_by_use_nulls;
     extern const SettingsBool join_use_nulls;
-    extern const SettingsBool rewrite_in_to_join;
 }
 
 namespace ErrorCodes
@@ -152,25 +150,6 @@ bool IdentifierResolveScope::canCacheIdentifier(
     return true;
 }
 
-bool IdentifierResolveScope::containsInOrExistsFunction(const IQueryTreeNode * node)
-{
-    if (!node)
-        return false;
-
-    if (node->getNodeType() == QueryTreeNodeType::FUNCTION)
-    {
-        const auto & func_name = node->as<const FunctionNode &>().getFunctionName();
-        if (isNameOfInFunction(func_name) || func_name == "exists")
-            return true;
-    }
-
-    for (const auto & child : node->getChildren())
-        if (child && containsInOrExistsFunction(child.get()))
-            return true;
-
-    return false;
-}
-
 std::optional<IdentifierResolveResult> IdentifierResolveScope::findCachedIdentifier(
     const IdentifierLookup & lookup,
     const IdentifierResolveContext & resolve_context) const
@@ -182,13 +161,7 @@ std::optional<IdentifierResolveResult> IdentifierResolveScope::findCachedIdentif
     if (it == identifier_resolve_cache.end())
         return {};
 
-    const auto & entry = it->second;
-    auto result = entry.result;
-
-    if (entry.needs_clone_on_retrieval)
-        result.resolved_identifier = result.resolved_identifier->clone();
-
-    return result;
+    return it->second;
 }
 
 void IdentifierResolveScope::tryCacheIdentifier(
@@ -204,11 +177,7 @@ void IdentifierResolveScope::tryCacheIdentifier(
     if (nullable_group_by_keys.contains(result.resolved_identifier))
         return;
 
-    bool needs_clone = context
-        && context->getSettingsRef()[Setting::rewrite_in_to_join]
-        && containsInOrExistsFunction(result.resolved_identifier.get());
-
-    identifier_resolve_cache[lookup] = {result, needs_clone};
+    identifier_resolve_cache[lookup] = result;
 }
 
 namespace

@@ -115,17 +115,10 @@ public:
             auto * function_node = node->as<FunctionNode>();
             if (isNameOfInFunction(function_node->getFunctionName()))
             {
-                auto & arg = function_node->getArguments().getNodes().back();
+                auto arg = function_node->getArguments().getNodes().back();
                 /// Avoid aliasing IN `table`
                 if (arg->getNodeType() != QueryTreeNodeType::TABLE)
-                {
-                    /// Clone the entire IN function node so that shared references
-                    /// (e.g. from the alias expression cache) each get an independent
-                    /// copy before we mutate the subquery argument in place.
-                    node = node->clone();
-                    function_node = node->as<FunctionNode>();
                     CreateUniqueTableAliasesVisitor(getContext()).visit(function_node->getArguments().getNodes().back());
-                }
             }
         }
     }
