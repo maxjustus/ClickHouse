@@ -825,10 +825,10 @@ private:
     }
 };
 
-class LogicalExpressionOptimizerVisitor : public InDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor, true /*memoize_by_pointer*/>
+class LogicalExpressionOptimizerVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<LogicalExpressionOptimizerVisitor>;
 
     explicit LogicalExpressionOptimizerVisitor(ContextPtr context)
         : Base(std::move(context))

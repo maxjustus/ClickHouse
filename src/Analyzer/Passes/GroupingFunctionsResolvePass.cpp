@@ -65,7 +65,7 @@ enum class GroupByKind : uint8_t
     GROUPING_SETS
 };
 
-class GroupingFunctionResolveVisitor : public InDepthQueryTreeVisitorWithContext<GroupingFunctionResolveVisitor, true /*memoize_by_pointer*/>
+class GroupingFunctionResolveVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<GroupingFunctionResolveVisitor>
 {
 public:
     GroupingFunctionResolveVisitor(GroupByKind group_by_kind_,
@@ -261,9 +261,9 @@ void resolveGroupingFunctions(QueryTreeNodePtr & query_node, ContextPtr context)
     visitor.visit(query_node);
 }
 
-class GroupingFunctionsResolveVisitor : public InDepthQueryTreeVisitorWithContext<GroupingFunctionsResolveVisitor, true /*memoize_by_pointer*/>
+class GroupingFunctionsResolveVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<GroupingFunctionsResolveVisitor>
 {
-    using Base = InDepthQueryTreeVisitorWithContext<GroupingFunctionsResolveVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<GroupingFunctionsResolveVisitor>;
 public:
     explicit GroupingFunctionsResolveVisitor(ContextPtr context_)
         : Base(std::move(context_))

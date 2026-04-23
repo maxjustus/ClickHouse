@@ -707,10 +707,10 @@ void optimizeNode(QueryTreeNodePtr & node, const QueryTreeNodes & table_expressi
     node = std::move(new_node);
 }
 
-class ConvertQueryToCNFVisitor : public InDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor, true /*memoize_by_pointer*/>
+class ConvertQueryToCNFVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<ConvertQueryToCNFVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

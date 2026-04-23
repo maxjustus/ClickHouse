@@ -246,10 +246,10 @@ void pruneNestedFunctionArguments(
 
 /// Visitor that updates reference ColumnNode types, rewrites stale numeric tupleElement
 /// indices, and re-resolves tupleElement functions after nested() arguments have been pruned.
-class UpdateArrayJoinReferenceTypesVisitor : public InDepthQueryTreeVisitorWithContext<UpdateArrayJoinReferenceTypesVisitor, true /*memoize_by_pointer*/>
+class UpdateArrayJoinReferenceTypesVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<UpdateArrayJoinReferenceTypesVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<UpdateArrayJoinReferenceTypesVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<UpdateArrayJoinReferenceTypesVisitor>;
 
     UpdateArrayJoinReferenceTypesVisitor(
         ContextPtr context_,

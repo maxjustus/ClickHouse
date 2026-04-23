@@ -25,10 +25,10 @@ namespace
 {
 
 /// Try to eliminate min/max/any/anyLast.
-class EliminateFunctionVisitor : public InDepthQueryTreeVisitorWithContext<EliminateFunctionVisitor, true /*memoize_by_pointer*/>
+class EliminateFunctionVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<EliminateFunctionVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<EliminateFunctionVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<EliminateFunctionVisitor>;
     using Base::Base;
 
     using GroupByKeysStack = std::vector<QueryTreeNodePtrWithHashSet>;

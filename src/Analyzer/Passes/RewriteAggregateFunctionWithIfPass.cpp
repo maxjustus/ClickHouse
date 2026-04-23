@@ -25,10 +25,10 @@ namespace Setting
 namespace
 {
 
-class RewriteAggregateFunctionWithIfVisitor : public InDepthQueryTreeVisitorWithContext<RewriteAggregateFunctionWithIfVisitor, true /*memoize_by_pointer*/>
+class RewriteAggregateFunctionWithIfVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<RewriteAggregateFunctionWithIfVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<RewriteAggregateFunctionWithIfVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<RewriteAggregateFunctionWithIfVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

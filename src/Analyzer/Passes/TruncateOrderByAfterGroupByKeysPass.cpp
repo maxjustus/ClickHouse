@@ -20,10 +20,10 @@ namespace Setting
 namespace
 {
 
-class TruncateOrderByAfterGroupByKeysVisitor : public InDepthQueryTreeVisitorWithContext<TruncateOrderByAfterGroupByKeysVisitor, true /*memoize_by_pointer*/>
+class TruncateOrderByAfterGroupByKeysVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<TruncateOrderByAfterGroupByKeysVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<TruncateOrderByAfterGroupByKeysVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<TruncateOrderByAfterGroupByKeysVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

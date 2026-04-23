@@ -11,9 +11,9 @@ namespace DB
 namespace
 {
 
-class InlineMaterializedCTEsVisitor : public InDepthQueryTreeVisitorWithContext<InlineMaterializedCTEsVisitor, true /*memoize_by_pointer*/>
+class InlineMaterializedCTEsVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<InlineMaterializedCTEsVisitor>
 {
-    using Base = InDepthQueryTreeVisitorWithContext<InlineMaterializedCTEsVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<InlineMaterializedCTEsVisitor>;
 public:
 
     explicit InlineMaterializedCTEsVisitor(const ReusedMaterializedCTEs & reused_materialized_cte_, ContextPtr context_)

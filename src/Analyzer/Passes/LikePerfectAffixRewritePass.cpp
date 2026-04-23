@@ -36,10 +36,10 @@ namespace
   *         - `LowCardinality(S)`, `Nullable(S)`, `LowCardinality(Nullable(S))` where `S` is either `String` or `FixedString`.
   *     - `endsWith`: same as `startsWith` except `FixedString` (nested or not), because `c LIKE '%suffix\0'` is not equal to `endsWith(c, 'suffix\0')`.
   */
-class LikePerfectAffixRewriteVisitor : public InDepthQueryTreeVisitorWithContext<LikePerfectAffixRewriteVisitor, true /*memoize_by_pointer*/>
+class LikePerfectAffixRewriteVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<LikePerfectAffixRewriteVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<LikePerfectAffixRewriteVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<LikePerfectAffixRewriteVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

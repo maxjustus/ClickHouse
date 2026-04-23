@@ -19,9 +19,9 @@ namespace Setting
 namespace
 {
 
-class OptimizeGroupByInjectiveFunctionsVisitor : public InDepthQueryTreeVisitorWithContext<OptimizeGroupByInjectiveFunctionsVisitor, true /*memoize_by_pointer*/>
+class OptimizeGroupByInjectiveFunctionsVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<OptimizeGroupByInjectiveFunctionsVisitor>
 {
-    using Base = InDepthQueryTreeVisitorWithContext<OptimizeGroupByInjectiveFunctionsVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<OptimizeGroupByInjectiveFunctionsVisitor>;
 public:
     explicit OptimizeGroupByInjectiveFunctionsVisitor(ContextPtr context)
         : Base(std::move(context))

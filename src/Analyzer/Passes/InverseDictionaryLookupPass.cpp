@@ -128,10 +128,10 @@ void resolveNode(const Node & node, const ContextPtr & context)
 }
 
 
-class InverseDictionaryLookupVisitor : public InDepthQueryTreeVisitorWithContext<InverseDictionaryLookupVisitor, true /*memoize_by_pointer*/>
+class InverseDictionaryLookupVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<InverseDictionaryLookupVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<InverseDictionaryLookupVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<InverseDictionaryLookupVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)
