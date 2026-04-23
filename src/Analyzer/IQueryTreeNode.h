@@ -85,7 +85,7 @@ struct ConvertToASTOptions
     bool set_subquery_cte_name = true;
 
     /// Optional cache for memoizing toAST() on shared nodes (caller-provided, scoped to single call tree)
-    mutable HashMap<const IQueryTreeNode *, ASTPtr> * toAST_cache = nullptr;
+    HashMap<const IQueryTreeNode *, ASTPtr> * toAST_cache = nullptr;
 };
 
 class IQueryTreeNode : public TypePromotion<IQueryTreeNode>
