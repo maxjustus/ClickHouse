@@ -22,7 +22,7 @@ QUERY id: 0
             ORDER BY
               LIST id: 11, nodes: 1
                 SORT id: 12, sort_direction: ASCENDING, with_fill: 0
-                  EXPRESSION
+                  EXPRESSION id
                     COLUMN id: 9, column_name: id, result_type: UInt64, source_id: 10
             LIMIT
               CONSTANT id: 13, constant_value: UInt64_4, constant_value_type: UInt64
