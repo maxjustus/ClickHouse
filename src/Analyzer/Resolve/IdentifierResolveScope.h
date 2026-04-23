@@ -239,18 +239,7 @@ private:
         const IdentifierLookup & lookup,
         const IdentifierResolveContext & resolve_context) const;
 
-    static bool containsInOrExistsFunction(const IQueryTreeNode * node);
-
-    struct CachedIdentifier
-    {
-        IdentifierResolveResult result;
-        /// Subtree contains IN/EXISTS functions that will be rewritten to JOINs.
-        /// `createUniqueAliasesIfNecessary` mutates these nodes in place, so each
-        /// retrieval must return a clone to prevent shared mutation.
-        bool needs_clone_on_retrieval = false;
-    };
-
-    std::unordered_map<IdentifierLookup, CachedIdentifier, IdentifierLookupHash> identifier_resolve_cache;
+    std::unordered_map<IdentifierLookup, IdentifierResolveResult, IdentifierLookupHash> identifier_resolve_cache;
     bool identifier_resolve_cache_enabled = true;
     bool identifier_resolve_cache_force_disabled = false;
 };

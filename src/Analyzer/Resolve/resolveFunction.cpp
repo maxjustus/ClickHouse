@@ -613,14 +613,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
 
                     auto equals_function_node_ptr = std::make_shared<FunctionNode>("equals");
 
-                    /// Clone the first IN argument only when it is shared, to avoid
-                    /// mutating a node owned by another expression. Check use_count
-                    /// on the original before making a shared_ptr copy (which would
-                    /// bump the count and make the check always true).
-                    const bool first_arg_is_shared = function_in_arguments_nodes[0].use_count() > 1;
-                    auto copy_of_in_first_parameter = first_arg_is_shared
-                        ? function_in_arguments_nodes[0]->clone()
-                        : function_in_arguments_nodes[0];
+                    auto copy_of_in_first_parameter = function_in_arguments_nodes[0];
 
                     auto subquery_projection = std::make_shared<IdentifierNode>(Identifier{unique_column_name});
 
