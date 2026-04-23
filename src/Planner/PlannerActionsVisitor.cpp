@@ -710,6 +710,7 @@ private:
 
     std::vector<ActionsScopeNode> actions_stack;
     std::unordered_map<QueryTreeNodePtr, std::string> node_to_node_name;
+    std::unordered_map<const IQueryTreeNode *, NodeNameAndNodeMinLevel> visit_cache;
     CorrelatedSubtrees correlated_subtrees;
     const PlannerContextPtr planner_context;
     const ColumnNodePtrWithHashSet & correlated_columns_set;
@@ -754,23 +755,33 @@ std::pair<ActionsDAG::NodeRawConstPtrs, CorrelatedSubtrees> PlannerActionsVisito
 
 PlannerActionsVisitorImpl::NodeNameAndNodeMinLevel PlannerActionsVisitorImpl::visitImpl(QueryTreeNodePtr node)
 {
+    auto * raw = node.get();
+    if (auto it = visit_cache.find(raw); it != visit_cache.end())
+        return it->second;
+
     auto node_type = node->getNodeType();
 
-    switch (node_type)
+    NodeNameAndNodeMinLevel result = [&]() -> NodeNameAndNodeMinLevel
     {
-    case QueryTreeNodeType::COLUMN:
-        return visitColumn(node);
-    case QueryTreeNodeType::CONSTANT:
-        return visitConstant(node);
-    case QueryTreeNodeType::FUNCTION:
-        return visitFunction(node);
-    case QueryTreeNodeType::QUERY:
-        return visitQuery(node);
-    default:
-        throw Exception(ErrorCodes::UNSUPPORTED_METHOD,
-            "Expected column, constant, function. Actual {} with type: {}",
-            node->formatASTForErrorMessage(), node_type);
-    }
+        switch (node_type)
+        {
+        case QueryTreeNodeType::COLUMN:
+            return visitColumn(node);
+        case QueryTreeNodeType::CONSTANT:
+            return visitConstant(node);
+        case QueryTreeNodeType::FUNCTION:
+            return visitFunction(node);
+        case QueryTreeNodeType::QUERY:
+            return visitQuery(node);
+        default:
+            throw Exception(ErrorCodes::UNSUPPORTED_METHOD,
+                "Expected column, constant, function. Actual {} with type: {}",
+                node->formatASTForErrorMessage(), node_type);
+        }
+    }();
+
+    visit_cache.emplace(raw, result);
+    return result;
 }
 
 PlannerActionsVisitorImpl::NodeNameAndNodeMinLevel PlannerActionsVisitorImpl::visitColumn(const QueryTreeNodePtr & node)
