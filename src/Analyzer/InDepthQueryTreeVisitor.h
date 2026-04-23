@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 
 #include <base/scope_guard.h>
 
@@ -79,7 +80,7 @@ public:
         }
         else if constexpr (memoize_by_pointer && const_visitor)
         {
-            if (!visited_nodes.insert({query_tree_node.get(), false}).second)
+            if (!visited_nodes.insert(query_tree_node.get()).second)
                 return;
         }
 
@@ -126,7 +127,7 @@ private:
     }
 
     using MemoMapType = std::unordered_map<const IQueryTreeNode *, QueryTreeNodePtr>;
-    using MemoSetType = std::unordered_map<const IQueryTreeNode *, bool>;
+    using MemoSetType = std::unordered_set<const IQueryTreeNode *>;
     using MemoType = std::conditional_t<const_visitor, MemoSetType, MemoMapType>;
     [[no_unique_address]] std::conditional_t<memoize_by_pointer, MemoType, std::monostate> visited_nodes;
 };
@@ -194,7 +195,7 @@ public:
             }
         }
 
-        const IQueryTreeNode * original_ptr = nullptr;
+        [[maybe_unused]] const IQueryTreeNode * original_ptr = nullptr;
         if constexpr (memoize_by_pointer)
             original_ptr = query_tree_node.get();
 

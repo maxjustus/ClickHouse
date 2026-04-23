@@ -185,6 +185,8 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
         Phase phase;
         /// Resolved weak pointer kept alive for the child currently being processed.
         QueryTreeNodePtr held_weak_child;
+        size_t num_strong_pushed = 0;
+        size_t num_weak_pushed = 0;
     };
 
     std::vector<Frame> stack;
@@ -232,23 +234,35 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 }
             }
 
-            /// Schedule children in reverse order so they execute left-to-right.
             frame.phase = Phase::CHILDREN_DONE;
 
+            /// Save index: push_back below may reallocate and invalidate `frame`.
+            size_t parent_idx = stack.size() - 1;
+
+            /// Schedule children in reverse order so they execute left-to-right.
+            size_t weak_pushed = 0;
             for (auto it = node->weak_pointers.rbegin(); it != node->weak_pointers.rend(); ++it)
             {
                 auto strong_ptr = it->lock();
                 if (!strong_ptr)
                     continue;
                 auto * raw = strong_ptr.get();
-                stack.push_back({raw, true, Phase::ENTER, std::move(strong_ptr)});
+                stack.push_back({raw, true, Phase::ENTER, std::move(strong_ptr), 0, 0});
+                ++weak_pushed;
             }
 
+            size_t strong_pushed = 0;
             for (auto it = node->children.rbegin(); it != node->children.rend(); ++it)
             {
                 if (*it)
-                    stack.push_back({it->get(), false, Phase::ENTER, {}});
+                {
+                    stack.push_back({it->get(), false, Phase::ENTER, {}, 0, 0});
+                    ++strong_pushed;
+                }
             }
+
+            stack[parent_idx].num_strong_pushed = strong_pushed;
+            stack[parent_idx].num_weak_pushed = weak_pushed;
 
             continue;
         }
@@ -266,18 +280,8 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
 
         node->updateTreeHashImpl(hash_state, compare_options);
 
-        /// Count non-null strong children.
-        size_t num_strong_nonnull = 0;
-        for (const auto & child : node->children)
-            if (child)
-                ++num_strong_nonnull;
-
-        /// Count non-null weak children.
-        size_t num_weak_nonnull = 0;
-        for (const auto & wp : node->weak_pointers)
-            if (!wp.expired())
-                ++num_weak_nonnull;
-
+        size_t num_strong_nonnull = frame.num_strong_pushed;
+        size_t num_weak_nonnull = frame.num_weak_pushed;
         size_t total_child_hashes = num_strong_nonnull + num_weak_nonnull;
 
         /// Pop child hashes from result_stack (they're in left-to-right order
