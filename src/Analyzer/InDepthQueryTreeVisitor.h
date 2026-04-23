@@ -71,7 +71,7 @@ public:
     {
         if constexpr (memoize_by_pointer && !const_visitor)
         {
-            auto it = visited_nodes.find(query_tree_node.get());
+            auto it = visited_nodes.find(query_tree_node);
             if (it != visited_nodes.end())
             {
                 query_tree_node = it->second;
@@ -84,9 +84,13 @@ public:
                 return;
         }
 
-        [[maybe_unused]] const IQueryTreeNode * original_ptr = nullptr;
+        /// Keep a copy of the original node pointer so that the memo key stays
+        /// valid after visitImpl mutates query_tree_node. The shared_ptr also
+        /// prevents the node's address from being freed and reused for a later
+        /// allocation in this pass (which would alias a stale entry).
+        [[maybe_unused]] QueryTreeNodePtr original;
         if constexpr (memoize_by_pointer && !const_visitor)
-            original_ptr = query_tree_node.get();
+            original = query_tree_node;
 
         bool traverse_top_to_bottom = getDerived().shouldTraverseTopToBottom();
         if (!traverse_top_to_bottom)
@@ -98,7 +102,7 @@ public:
             visitChildren(query_tree_node);
 
         if constexpr (memoize_by_pointer && !const_visitor)
-            visited_nodes[original_ptr] = query_tree_node;
+            visited_nodes.emplace(std::move(original), query_tree_node);
     }
 
 private:
@@ -126,7 +130,13 @@ private:
         }
     }
 
-    using MemoMapType = std::unordered_map<const IQueryTreeNode *, QueryTreeNodePtr>;
+    /// For mutating visitors, map the original node (as a shared_ptr so its
+    /// address stays reserved for this pass) to its replacement. Default
+    /// std::hash / equality on shared_ptr use pointer identity, which is what
+    /// we want — two QueryTreeNodePtrs compare equal iff they point at the
+    /// same node. Const visitors can't replace nodes, so a raw-pointer set is
+    /// sufficient.
+    using MemoMapType = std::unordered_map<QueryTreeNodePtr, QueryTreeNodePtr>;
     using MemoSetType = std::unordered_set<const IQueryTreeNode *>;
     using MemoType = std::conditional_t<const_visitor, MemoSetType, MemoMapType>;
     [[no_unique_address]] std::conditional_t<memoize_by_pointer, MemoType, std::monostate> visited_nodes;
@@ -187,7 +197,7 @@ public:
     {
         if constexpr (memoize_by_pointer)
         {
-            auto it = visited_nodes.find(query_tree_node.get());
+            auto it = visited_nodes.find(query_tree_node);
             if (it != visited_nodes.end())
             {
                 query_tree_node = it->second;
@@ -195,9 +205,13 @@ public:
             }
         }
 
-        [[maybe_unused]] const IQueryTreeNode * original_ptr = nullptr;
+        /// Keep a copy of the original node pointer so that the memo key stays
+        /// valid after enterImpl mutates query_tree_node. The shared_ptr also
+        /// prevents the node's address from being freed and reused for a later
+        /// allocation in this pass (which would alias a stale entry).
+        [[maybe_unused]] QueryTreeNodePtr original;
         if constexpr (memoize_by_pointer)
-            original_ptr = query_tree_node.get();
+            original = query_tree_node;
 
         auto current_scope_context_ptr = current_context;
         SCOPE_EXIT(
@@ -219,7 +233,7 @@ public:
         getDerived().leaveImpl(query_tree_node);
 
         if constexpr (memoize_by_pointer)
-            visited_nodes[original_ptr] = query_tree_node;
+            visited_nodes.emplace(std::move(original), query_tree_node);
     }
 
     void enterImpl(VisitQueryTreeNodeType & node [[maybe_unused]])
@@ -281,8 +295,11 @@ private:
 
     ContextPtr current_context;
     size_t subquery_depth = 0;
+    /// See the mutating-visitor variant above for rationale: the shared_ptr
+    /// key keeps the original node alive, so its address can't be reused for
+    /// a fresh allocation during the pass and alias a stale entry.
     [[no_unique_address]] std::conditional_t<memoize_by_pointer,
-        std::unordered_map<const IQueryTreeNode *, QueryTreeNodePtr>,
+        std::unordered_map<QueryTreeNodePtr, QueryTreeNodePtr>,
         std::monostate> visited_nodes;
 };
 
