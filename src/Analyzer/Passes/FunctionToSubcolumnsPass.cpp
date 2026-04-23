@@ -899,10 +899,10 @@ public:
     }
 };
 
-class GetOuterJoinedTablesVisitor : public InDepthQueryTreeVisitorWithContext<GetOuterJoinedTablesVisitor, true /*memoize_by_pointer*/>
+class GetOuterJoinedTablesVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<GetOuterJoinedTablesVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<GetOuterJoinedTablesVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<GetOuterJoinedTablesVisitor>;
     using Base::Base;
 
     void enterImpl(const QueryTreeNodePtr & node)

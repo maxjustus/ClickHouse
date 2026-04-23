@@ -13,10 +13,10 @@ namespace Setting
     extern const SettingsUInt64 allow_experimental_parallel_reading_from_replicas;
 }
 
-class DisableParallelReplicasVisitor : public InDepthQueryTreeVisitorWithContext<DisableParallelReplicasVisitor, true /*memoize_by_pointer*/>
+class DisableParallelReplicasVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<DisableParallelReplicasVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<DisableParallelReplicasVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<DisableParallelReplicasVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

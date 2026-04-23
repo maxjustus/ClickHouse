@@ -176,13 +176,13 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
     HashMap<const IQueryTreeNode *, Hash> strong_memo;
     HashMap<const IQueryTreeNode *, size_t> weak_node_to_identifier;
 
-    enum class Phase : uint8_t { ENTER, CHILDREN_DONE };
-
     struct Frame
     {
         const IQueryTreeNode * node;
         bool is_weak;
-        Phase phase;
+        /// False when entering the node (memo check + schedule children),
+        /// true on the second visit (accumulate child hashes into parent).
+        bool children_done;
         /// Resolved weak pointer kept alive for the child currently being processed.
         QueryTreeNodePtr held_weak_child;
         size_t num_strong_pushed = 0;
@@ -190,7 +190,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
     };
 
     std::vector<Frame> stack;
-    stack.push_back({this, false, Phase::ENTER, {}});
+    stack.push_back({this, false, false, {}});
 
     /// Collects child hashes for the current parent.  Each time a child
     /// completes, its Hash is pushed here.  When the parent reaches
@@ -202,7 +202,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
         auto & frame = stack.back();
         const auto * node = frame.node;
 
-        if (frame.phase == Phase::ENTER)
+        if (!frame.children_done)
         {
             /// Check memos before descending.
             if (frame.is_weak)
@@ -234,7 +234,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 }
             }
 
-            frame.phase = Phase::CHILDREN_DONE;
+            frame.children_done = true;
 
             /// Save index: push_back below may reallocate and invalidate `frame`.
             size_t parent_idx = stack.size() - 1;
@@ -247,7 +247,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 if (!strong_ptr)
                     continue;
                 auto * raw = strong_ptr.get();
-                stack.push_back({raw, true, Phase::ENTER, std::move(strong_ptr), 0, 0});
+                stack.push_back({raw, true, false, std::move(strong_ptr), 0, 0});
                 ++weak_pushed;
             }
 
@@ -256,7 +256,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
             {
                 if (*it)
                 {
-                    stack.push_back({it->get(), false, Phase::ENTER, {}, 0, 0});
+                    stack.push_back({it->get(), false, false, {}, 0, 0});
                     ++strong_pushed;
                 }
             }
@@ -267,8 +267,8 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
             continue;
         }
 
-        /// Phase::CHILDREN_DONE — all children have completed and their
-        /// hashes are on result_stack.  Pop them and build this node's hash.
+        /// Second visit — all children have completed and their hashes are
+        /// on result_stack.  Pop them and build this node's hash.
         HashState hash_state;
         hash_state.update(static_cast<size_t>(node->getNodeType()));
 

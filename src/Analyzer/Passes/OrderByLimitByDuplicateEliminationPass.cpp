@@ -11,7 +11,7 @@ namespace DB
 namespace
 {
 
-class OrderByLimitByDuplicateEliminationVisitor : public InDepthQueryTreeVisitor<OrderByLimitByDuplicateEliminationVisitor, false /*const_visitor*/, true /*memoize_by_pointer*/>
+class OrderByLimitByDuplicateEliminationVisitor : public MemoizingInDepthQueryTreeVisitor<OrderByLimitByDuplicateEliminationVisitor>
 {
 public:
     void visitImpl(QueryTreeNodePtr & node)

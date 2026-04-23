@@ -18,10 +18,10 @@ namespace Setting
     extern const SettingsBool optimize_group_by_function_keys;
 }
 
-class OptimizeGroupByFunctionKeysVisitor : public InDepthQueryTreeVisitorWithContext<OptimizeGroupByFunctionKeysVisitor, true /*memoize_by_pointer*/>
+class OptimizeGroupByFunctionKeysVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<OptimizeGroupByFunctionKeysVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<OptimizeGroupByFunctionKeysVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<OptimizeGroupByFunctionKeysVisitor>;
     using Base::Base;
 
     static bool needChildVisit(QueryTreeNodePtr & parent, QueryTreeNodePtr & child)

@@ -32,10 +32,10 @@ bool isUniqFunction(const String & function_name)
         function_name == "uniqTheta";
 }
 
-class UniqInjectiveFunctionsEliminationVisitor : public InDepthQueryTreeVisitorWithContext<UniqInjectiveFunctionsEliminationVisitor, true /*memoize_by_pointer*/>
+class UniqInjectiveFunctionsEliminationVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<UniqInjectiveFunctionsEliminationVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<UniqInjectiveFunctionsEliminationVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<UniqInjectiveFunctionsEliminationVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

@@ -42,10 +42,10 @@ namespace Setting
 namespace
 {
 
-class ConvertOrLikeChainVisitor : public InDepthQueryTreeVisitorWithContext<ConvertOrLikeChainVisitor, true /*memoize_by_pointer*/>
+class ConvertOrLikeChainVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<ConvertOrLikeChainVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ConvertOrLikeChainVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<ConvertOrLikeChainVisitor>;
     using Base::Base;
 
     explicit ConvertOrLikeChainVisitor(FunctionOverloadResolverPtr or_function_resolver_,

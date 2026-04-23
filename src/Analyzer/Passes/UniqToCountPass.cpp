@@ -119,10 +119,10 @@ bool nodeListContainsAll(const QueryTreeNodes & query_columns, const NamesAndTyp
 
 }
 
-class UniqToCountVisitor : public InDepthQueryTreeVisitorWithContext<UniqToCountVisitor, true /*memoize_by_pointer*/>
+class UniqToCountVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<UniqToCountVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<UniqToCountVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<UniqToCountVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

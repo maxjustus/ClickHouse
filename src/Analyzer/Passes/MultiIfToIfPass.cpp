@@ -17,10 +17,10 @@ namespace Setting
 namespace
 {
 
-class MultiIfToIfVisitor : public InDepthQueryTreeVisitorWithContext<MultiIfToIfVisitor, true /*memoize_by_pointer*/>
+class MultiIfToIfVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<MultiIfToIfVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<MultiIfToIfVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<MultiIfToIfVisitor>;
     using Base::Base;
 
     explicit MultiIfToIfVisitor(FunctionOverloadResolverPtr if_function_ptr_, ContextPtr context)

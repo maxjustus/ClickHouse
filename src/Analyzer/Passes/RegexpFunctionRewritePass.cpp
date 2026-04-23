@@ -22,10 +22,10 @@ namespace Setting
 namespace
 {
 
-class RegexpFunctionRewriteVisitor : public InDepthQueryTreeVisitorWithContext<RegexpFunctionRewriteVisitor, true /*memoize_by_pointer*/>
+class RegexpFunctionRewriteVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<RegexpFunctionRewriteVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<RegexpFunctionRewriteVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<RegexpFunctionRewriteVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

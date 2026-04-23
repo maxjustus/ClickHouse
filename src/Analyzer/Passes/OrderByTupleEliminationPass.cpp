@@ -12,7 +12,7 @@ namespace DB
 namespace
 {
 
-class OrderByTupleEliminationVisitor : public InDepthQueryTreeVisitor<OrderByTupleEliminationVisitor, false /*const_visitor*/, true /*memoize_by_pointer*/>
+class OrderByTupleEliminationVisitor : public MemoizingInDepthQueryTreeVisitor<OrderByTupleEliminationVisitor>
 {
 public:
     static void visitImpl(QueryTreeNodePtr & node)

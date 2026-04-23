@@ -21,10 +21,10 @@ namespace Setting
 namespace
 {
 
-class NormalizeCountVariantsVisitor : public InDepthQueryTreeVisitorWithContext<NormalizeCountVariantsVisitor, true /*memoize_by_pointer*/>
+class NormalizeCountVariantsVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<NormalizeCountVariantsVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<NormalizeCountVariantsVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<NormalizeCountVariantsVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

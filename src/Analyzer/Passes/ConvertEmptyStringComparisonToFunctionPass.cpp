@@ -23,10 +23,10 @@ namespace
 {
 
 class ConvertEmptyStringComparisonToFunctionVisitor
-    : public InDepthQueryTreeVisitorWithContext<ConvertEmptyStringComparisonToFunctionVisitor, true /*memoize_by_pointer*/>
+    : public MemoizingInDepthQueryTreeVisitorWithContext<ConvertEmptyStringComparisonToFunctionVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<ConvertEmptyStringComparisonToFunctionVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<ConvertEmptyStringComparisonToFunctionVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

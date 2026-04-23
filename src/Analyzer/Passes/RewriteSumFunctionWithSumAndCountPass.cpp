@@ -19,10 +19,10 @@ namespace Setting
 namespace
 {
 
-class RewriteSumFunctionWithSumAndCountVisitor : public InDepthQueryTreeVisitorWithContext<RewriteSumFunctionWithSumAndCountVisitor, true /*memoize_by_pointer*/>
+class RewriteSumFunctionWithSumAndCountVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<RewriteSumFunctionWithSumAndCountVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<RewriteSumFunctionWithSumAndCountVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<RewriteSumFunctionWithSumAndCountVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

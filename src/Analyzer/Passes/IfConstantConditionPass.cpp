@@ -13,10 +13,10 @@ namespace DB
 namespace
 {
 
-class IfConstantConditionVisitor : public InDepthQueryTreeVisitorWithContext<IfConstantConditionVisitor, true /*memoize_by_pointer*/>
+class IfConstantConditionVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<IfConstantConditionVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<IfConstantConditionVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<IfConstantConditionVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)

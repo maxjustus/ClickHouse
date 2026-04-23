@@ -145,6 +145,14 @@ private:
 template <typename Derived, bool memoize_by_pointer = false>
 using ConstInDepthQueryTreeVisitor = InDepthQueryTreeVisitor<Derived, true /*const_visitor*/, memoize_by_pointer>;
 
+/// Shorthand for the common case of memoization on a mutating visitor.
+/// See memoize_by_pointer docs on the primary template.
+template <typename Derived>
+using MemoizingInDepthQueryTreeVisitor = InDepthQueryTreeVisitor<Derived, false /*const_visitor*/, true /*memoize_by_pointer*/>;
+
+template <typename Derived>
+using MemoizingConstInDepthQueryTreeVisitor = InDepthQueryTreeVisitor<Derived, true /*const_visitor*/, true /*memoize_by_pointer*/>;
+
 /** Same as InDepthQueryTreeVisitor (but has a different interface) and additionally keeps track of current scope context.
   * This can be useful if your visitor has special logic that depends on current scope context.
   *
@@ -302,5 +310,9 @@ private:
         std::unordered_map<QueryTreeNodePtr, QueryTreeNodePtr>,
         std::monostate> visited_nodes;
 };
+
+/// Shorthand for the common case of memoization on a context-tracking visitor.
+template <typename Derived>
+using MemoizingInDepthQueryTreeVisitorWithContext = InDepthQueryTreeVisitorWithContext<Derived, true /*memoize_by_pointer*/>;
 
 }

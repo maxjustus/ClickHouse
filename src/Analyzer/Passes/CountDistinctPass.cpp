@@ -23,10 +23,10 @@ namespace Setting
 namespace
 {
 
-class CountDistinctVisitor : public InDepthQueryTreeVisitorWithContext<CountDistinctVisitor, true /*memoize_by_pointer*/>
+class CountDistinctVisitor : public MemoizingInDepthQueryTreeVisitorWithContext<CountDistinctVisitor>
 {
 public:
-    using Base = InDepthQueryTreeVisitorWithContext<CountDistinctVisitor, true /*memoize_by_pointer*/>;
+    using Base = MemoizingInDepthQueryTreeVisitorWithContext<CountDistinctVisitor>;
     using Base::Base;
 
     void enterImpl(QueryTreeNodePtr & node)
