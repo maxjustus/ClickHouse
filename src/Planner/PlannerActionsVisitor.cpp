@@ -755,9 +755,17 @@ std::pair<ActionsDAG::NodeRawConstPtrs, CorrelatedSubtrees> PlannerActionsVisito
 
 PlannerActionsVisitorImpl::NodeNameAndNodeMinLevel PlannerActionsVisitorImpl::visitImpl(QueryTreeNodePtr node)
 {
+    /// Only use the cache when no lambda scopes are active. Inside a lambda,
+    /// visit* methods add the node as INPUT at the lambda's ActionsDAG level —
+    /// returning a cached result would skip that side effect.
+    bool can_use_cache = actions_stack.size() == 1;
+
     auto * raw = node.get();
-    if (auto it = visit_cache.find(raw); it != visit_cache.end())
-        return it->second;
+    if (can_use_cache)
+    {
+        if (auto it = visit_cache.find(raw); it != visit_cache.end())
+            return it->second;
+    }
 
     auto node_type = node->getNodeType();
 
@@ -780,7 +788,9 @@ PlannerActionsVisitorImpl::NodeNameAndNodeMinLevel PlannerActionsVisitorImpl::vi
         }
     }();
 
-    visit_cache.emplace(raw, result);
+    if (can_use_cache)
+        visit_cache.emplace(raw, result);
+
     return result;
 }
 
