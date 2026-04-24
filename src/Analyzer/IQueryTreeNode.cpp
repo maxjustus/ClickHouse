@@ -179,23 +179,24 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
     struct Frame
     {
         const IQueryTreeNode * node;
-        bool is_weak;
+        bool is_weak = false;
         /// False when entering the node (memo check + schedule children),
         /// true on the second visit (accumulate child hashes into parent).
-        bool children_done;
-        /// Resolved weak pointer kept alive for the child currently being processed.
-        QueryTreeNodePtr held_weak_child;
+        bool children_done = false;
+        /// If the frame was entered via a weak pointer, this keeps the locked
+        /// shared_ptr alive for the whole subtree so the raw pointer stays valid.
+        QueryTreeNodePtr held_weak_child = {};
         size_t num_strong_pushed = 0;
         size_t num_weak_pushed = 0;
     };
 
     std::vector<Frame> stack;
-    stack.push_back({this, false, false, {}});
+    stack.push_back({.node = this});
 
-    /// Collects child hashes for the current parent.  Each time a child
-    /// completes, its Hash is pushed here.  When the parent reaches
-    /// CHILDREN_DONE it pops exactly the right number of child hashes.
-    std::vector<Hash> result_stack;
+    /// Buffer of completed child hashes, in left-to-right completion order.
+    /// When a frame reaches its second visit it slices off exactly its own
+    /// num_strong_pushed + num_weak_pushed entries from the tail.
+    std::vector<Hash> child_hashes;
 
     while (!stack.empty())
     {
@@ -212,7 +213,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 {
                     HashState h;
                     h.update(it->getMapped());
-                    result_stack.push_back(getSipHash128AsPair(h));
+                    child_hashes.push_back(getSipHash128AsPair(h));
                     stack.pop_back();
                     continue;
                 }
@@ -228,7 +229,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 auto * it = strong_memo.find(node);
                 if (it)
                 {
-                    result_stack.push_back(it->getMapped());
+                    child_hashes.push_back(it->getMapped());
                     stack.pop_back();
                     continue;
                 }
@@ -247,7 +248,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 if (!strong_ptr)
                     continue;
                 auto * raw = strong_ptr.get();
-                stack.push_back({raw, true, false, std::move(strong_ptr), 0, 0});
+                stack.push_back({.node = raw, .is_weak = true, .held_weak_child = std::move(strong_ptr)});
                 ++weak_pushed;
             }
 
@@ -256,7 +257,7 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
             {
                 if (*it)
                 {
-                    stack.push_back({it->get(), false, false, {}, 0, 0});
+                    stack.push_back({.node = it->get()});
                     ++strong_pushed;
                 }
             }
@@ -267,8 +268,8 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
             continue;
         }
 
-        /// Second visit — all children have completed and their hashes are
-        /// on result_stack.  Pop them and build this node's hash.
+        /// Second visit — all children have completed and their hashes sit
+        /// at the tail of child_hashes in left-to-right completion order.
         HashState hash_state;
         hash_state.update(static_cast<size_t>(node->getNodeType()));
 
@@ -280,29 +281,23 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
 
         node->updateTreeHashImpl(hash_state, compare_options);
 
-        size_t num_strong_nonnull = frame.num_strong_pushed;
-        size_t num_weak_nonnull = frame.num_weak_pushed;
-        size_t total_child_hashes = num_strong_nonnull + num_weak_nonnull;
-
-        /// Pop child hashes from result_stack (they're in left-to-right order
-        /// at the top of the stack).
-        size_t first_child = result_stack.size() - total_child_hashes;
+        size_t first_child = child_hashes.size() - frame.num_strong_pushed - frame.num_weak_pushed;
 
         hash_state.update(node->children.size());
-        for (size_t i = 0; i < num_strong_nonnull; ++i)
+        for (size_t i = 0; i < frame.num_strong_pushed; ++i)
         {
-            hash_state.update(result_stack[first_child + i].low64);
-            hash_state.update(result_stack[first_child + i].high64);
+            hash_state.update(child_hashes[first_child + i].low64);
+            hash_state.update(child_hashes[first_child + i].high64);
         }
 
         hash_state.update(node->weak_pointers.size());
-        for (size_t i = 0; i < num_weak_nonnull; ++i)
+        for (size_t i = 0; i < frame.num_weak_pushed; ++i)
         {
-            hash_state.update(result_stack[first_child + num_strong_nonnull + i].low64);
-            hash_state.update(result_stack[first_child + num_strong_nonnull + i].high64);
+            hash_state.update(child_hashes[first_child + frame.num_strong_pushed + i].low64);
+            hash_state.update(child_hashes[first_child + frame.num_strong_pushed + i].high64);
         }
 
-        result_stack.resize(first_child);
+        child_hashes.resize(first_child);
 
         Hash result = getSipHash128AsPair(hash_state);
 
@@ -315,11 +310,11 @@ IQueryTreeNode::Hash IQueryTreeNode::getTreeHash(CompareOptions compare_options)
                 lookup->getMapped() = result;
         }
 
-        result_stack.push_back(result);
+        child_hashes.push_back(result);
         stack.pop_back();
     }
 
-    return result_stack.back();
+    return child_hashes.back();
 }
 
 QueryTreeNodePtr IQueryTreeNode::clone() const
