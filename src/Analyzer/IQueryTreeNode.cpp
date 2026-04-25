@@ -240,6 +240,17 @@ QueryTreeNodePtr IQueryTreeNode::clone() const
     return cloneAndReplace({});
 }
 
+QueryTreeNodePtr IQueryTreeNode::shallowClone() const
+{
+    auto result = cloneImpl();
+    result->children = children;
+    result->weak_pointers = weak_pointers;
+    result->alias = alias;
+    result->original_alias = original_alias;
+    result->original_ast = original_ast;
+    return result;
+}
+
 QueryTreeNodePtr IQueryTreeNode::cloneAndReplace(const ReplacementMap & replacement_map) const
 {
     /** Clone tree with this node as root.

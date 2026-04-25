@@ -157,16 +157,7 @@ public:
       * but does NOT deep-copy the children objects. The clone shares the same
       * child nodes as the original. Cost: O(children count), not O(subtree).
       */
-    QueryTreeNodePtr shallowClone() const
-    {
-        auto result = cloneImpl();
-        result->children = children;
-        result->weak_pointers = weak_pointers;
-        result->alias = alias;
-        result->original_alias = original_alias;
-        result->original_ast = original_ast;
-        return result;
-    }
+    QueryTreeNodePtr shallowClone() const;
 
     /// Returns true if node has alias, false otherwise
     bool hasAlias() const
