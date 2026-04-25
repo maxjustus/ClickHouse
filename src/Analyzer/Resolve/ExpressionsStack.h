@@ -24,9 +24,6 @@ public:
         {
             if (AggregateFunctionFactory::instance().isAggregateFunctionName(function->getFunctionName()))
                 ++aggregate_functions_counter;
-
-            if (isSubqueryFunction(function))
-                ++subquery_function_depth;
         }
 
         expressions.emplace_back(node);
@@ -51,9 +48,6 @@ public:
         {
             if (AggregateFunctionFactory::instance().isAggregateFunctionName(function->getFunctionName()))
                 --aggregate_functions_counter;
-
-            if (isSubqueryFunction(function))
-                --subquery_function_depth;
         }
 
         expressions.pop_back();
@@ -84,11 +78,6 @@ public:
     bool hasAggregateFunction() const
     {
         return aggregate_functions_counter > 0;
-    }
-
-    bool isInsideSubqueryFunction() const
-    {
-        return subquery_function_depth > 0;
     }
 
     QueryTreeNodePtr getExpressionWithAlias(const std::string & alias) const
@@ -141,15 +130,8 @@ public:
     }
 
 private:
-    static bool isSubqueryFunction(const FunctionNode * function)
-    {
-        const auto & name = function->getFunctionName();
-        return isNameOfInFunction(name) || name == "exists";
-    }
-
     QueryTreeNodes expressions;
     size_t aggregate_functions_counter = 0;
-    size_t subquery_function_depth = 0;
     std::unordered_map<std::string, QueryTreeNodes> alias_name_to_expressions;
 };
 

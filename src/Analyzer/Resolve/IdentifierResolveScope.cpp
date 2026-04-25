@@ -172,12 +172,6 @@ void IdentifierResolveScope::tryCacheIdentifier(
     if (!canCacheIdentifier(lookup, resolve_context))
         return;
 
-    /// Don't cache nodes in `nullable_group_by_keys` — their type depends on context:
-    /// non-nullable inside aggregate functions, nullable outside (see convertToNullable
-    /// calls after resolution). Caching would return the wrong type for one context.
-    if (nullable_group_by_keys.contains(result.resolved_identifier))
-        return;
-
     identifier_resolve_cache[lookup] = result;
 }
 

@@ -1361,8 +1361,6 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     IdentifierResolveScope & scope,
     IdentifierResolveContext identifier_resolve_context)
 {
-    const bool inside_subquery_function = scope.expressions_in_resolve_process_stack.isInsideSubqueryFunction();
-
     auto it = scope.identifier_in_lookup_process.find(identifier_lookup);
 
     bool already_in_resolve_process = false;
@@ -1373,11 +1371,12 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     }
     else
     {
-        if (!inside_subquery_function)
+        auto cached_result = scope.findCachedIdentifier(identifier_lookup, identifier_resolve_context);
+        if (cached_result)
         {
-            auto cached_result = scope.findCachedIdentifier(identifier_lookup, identifier_resolve_context);
-            if (cached_result)
-                return *cached_result;
+            auto result = *cached_result;
+            result.resolved_identifier = result.resolved_identifier->shallowClone();
+            return result;
         }
 
         auto [insert_it, _] = scope.identifier_in_lookup_process.insert({identifier_lookup, IdentifierResolveState()});
@@ -1493,7 +1492,7 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     if (it->second.count == 0)
     {
         scope.identifier_in_lookup_process.erase(it);
-        if (resolve_result.resolved_identifier && !inside_subquery_function)
+        if (resolve_result.resolved_identifier)
             scope.tryCacheIdentifier(identifier_lookup, resolve_result, identifier_resolve_context);
     }
 
@@ -5494,7 +5493,6 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
     resolveQueryJoinTreeNode(query_node_typed.getJoinTree(), scope, visitor);
 
     /// Enable cache after join tree is resolved and all table expressions are registered.
-    /// group_by_use_nulls is handled by not caching nodes in nullable_group_by_keys.
     scope.enableIdentifierCache();
 
     /// Resolve query node sections.
