@@ -27,7 +27,7 @@ QUERY id: 0
     LIST id: 14, nodes: 1
       SORT id: 15, sort_direction: ASCENDING, with_fill: 0
         EXPRESSION n.a
-          FUNCTION id: 2, function_name: tupleElement, function_type: ordinary, result_type: Int64
+          FUNCTION id: 16, function_name: tupleElement, function_type: ordinary, result_type: Int64
             ARGUMENTS
               LIST id: 3, nodes: 2
                 COLUMN id: 4, column_name: __array_join_exp_1, result_type: Tuple(a Int64), source_id: 5
@@ -80,7 +80,7 @@ QUERY id: 0
     LIST id: 19, nodes: 1
       SORT id: 20, sort_direction: ASCENDING, with_fill: 0
         EXPRESSION n.a
-          FUNCTION id: 2, function_name: tupleElement, function_type: ordinary, result_type: Int64
+          FUNCTION id: 21, function_name: tupleElement, function_type: ordinary, result_type: Int64
             ARGUMENTS
               LIST id: 3, nodes: 2
                 COLUMN id: 4, column_name: __array_join_exp_1, result_type: Tuple(a Int64, b Int64), source_id: 5

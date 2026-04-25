@@ -18,7 +18,7 @@ SELECT 'Columns';
 Columns
 DESCRIBE (SELECT test_table.id, test_table.id, id FROM test_table);
 id	UInt64					
-id	UInt64					
+test_table.id	UInt64					
 id	UInt64					
 SELECT '--';
 --
@@ -129,10 +129,10 @@ c	UInt64
 SELECT '--';
 --
 DESCRIBE (SELECT plus(test_table.id AS a, test_table.id), plus(id, id AS b), plus(b, b), plus(test_table.id, test_table.id) FROM test_table);
-plus(a, id)	UInt64					
+plus(a, test_table.id)	UInt64					
 plus(id, b)	UInt64					
 plus(b, b)	UInt64					
-plus(id, id)	UInt64					
+plus(test_table.id, test_table.id)	UInt64					
 SELECT '--';
 --
 DESCRIBE (SELECT test_table.* REPLACE id + (id AS id_alias) AS id, id_alias FROM test_table);
@@ -175,7 +175,7 @@ arrayMap(lambda(tuple(x), plus(x, a)), [1, 2, 3])	Array(UInt16)
 SELECT '--';
 --
 DESCRIBE (SELECT arrayMap(x -> x + test_table.id + test_table.id + id, [1,2,3]) FROM test_table);
-arrayMap(lambda(tuple(x), plus(plus(plus(x, id), id), id)), [1, 2, 3])	Array(UInt64)					
+arrayMap(lambda(tuple(x), plus(plus(plus(x, id), test_table.id), id)), [1, 2, 3])	Array(UInt64)					
 SELECT '--';
 --
 DESCRIBE (SELECT arrayMap(x -> x + (test_table.id AS first) + (test_table.id AS second) + id, [1,2,3]) FROM test_table);
