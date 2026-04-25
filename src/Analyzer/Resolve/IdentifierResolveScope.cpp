@@ -157,7 +157,7 @@ std::optional<IdentifierResolveResult> IdentifierResolveScope::findCachedIdentif
     if (!canCacheIdentifier(lookup, resolve_context))
         return {};
 
-    auto it = identifier_resolve_cache.find(lookup);
+    auto it = identifier_resolve_cache.find({lookup, allow_resolve_from_using});
     if (it == identifier_resolve_cache.end())
         return {};
 
@@ -172,13 +172,22 @@ void IdentifierResolveScope::tryCacheIdentifier(
     if (!canCacheIdentifier(lookup, resolve_context))
         return;
 
-    /// Don't cache nodes in `nullable_group_by_keys` — their type depends on context:
-    /// non-nullable inside aggregate functions, nullable outside (see convertToNullable
-    /// calls after resolution). Caching would return the wrong type for one context.
+    /// Don't cache resolved identifiers whose resolution path runs `convertToNullable`
+    /// on the alias target. With `group_by_use_nulls`, an alias whose target is a
+    /// FUNCTION GROUP BY key (e.g. `number + number AS b`) is resolved via
+    /// `tryResolveIdentifierFromAliases` -> `resolveExpressionNode(alias_node, ...)`,
+    /// where `alias_node` is a reference. The post-resolve nullable-rewrite at the
+    /// matching `nullable_group_by_keys` site reassigns that reference to a deep
+    /// clone with `wrap_with_nullable=true`, and the alias resolver then returns
+    /// the rewritten nullable node. Caching it would propagate the nullable form
+    /// to in-aggregate-function uses (where the key must remain non-nullable),
+    /// causing the aggregate to dispatch via `AggregateFunctionNullVariadic`
+    /// against non-Nullable runtime columns. Shallow-cloning the cached entry on
+    /// hit doesn't help: `cloneImpl` for `FunctionNode` copies `wrap_with_nullable`.
     if (nullable_group_by_keys.contains(result.resolved_identifier))
         return;
 
-    identifier_resolve_cache[lookup] = result;
+    identifier_resolve_cache[{lookup, allow_resolve_from_using}] = result;
 }
 
 namespace

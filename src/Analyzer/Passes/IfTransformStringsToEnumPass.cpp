@@ -4,6 +4,7 @@
 #include <Analyzer/FunctionNode.h>
 #include <Analyzer/IQueryTreeNode.h>
 #include <Analyzer/InDepthQueryTreeVisitor.h>
+#include <Analyzer/ListNode.h>
 #include <Analyzer/Utils.h>
 #include <Core/Settings.h>
 
@@ -90,7 +91,13 @@ void wrapIntoToString(FunctionNode & function_node, QueryTreeNodePtr arg, Contex
 {
     auto to_string_function = FunctionFactory::instance().get("toString", std::move(context));
     QueryTreeNodes arguments{ std::move(arg) };
-    function_node.getArguments().getNodes() = std::move(arguments);
+    /// Replace the arguments ListNode wholesale rather than mutating its inner vector,
+    /// because the existing ListNode shared_ptr can be aliased between distinct
+    /// FunctionNode wrappers via cache-hit shallow-clone (which copies the children
+    /// vector but shares each element's shared_ptr). Mutating the shared ListNode would
+    /// shrink the args of unrelated `if` references that the planner later trips over
+    /// with 'Number of arguments for function if doesn't match: passed 1, should be 3'.
+    function_node.getArgumentsNode() = std::make_shared<ListNode>(std::move(arguments));
 
     function_node.resolveAsFunction(to_string_function->build(function_node.getArgumentColumns()));
 

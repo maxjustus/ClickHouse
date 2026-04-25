@@ -239,7 +239,32 @@ private:
         const IdentifierLookup & lookup,
         const IdentifierResolveContext & resolve_context) const;
 
-    std::unordered_map<IdentifierLookup, IdentifierResolveResult, IdentifierLookupHash> identifier_resolve_cache;
+    /** Cache key bundles the lookup with the scope flags that influence resolution semantics.
+      * Currently only `allow_resolve_from_using` — same identifier resolves to a different node
+      * with vs. without USING resolution (see `IdentifierResolver.cpp` and `QueryAnalyzer.cpp`
+      * `JOIN ... USING` paths). Keeping the flag in the cache key lets the cache stay live
+      * during PREWHERE (where the flag toggles to false) without cross-section pollution.
+      */
+    struct CachedIdentifierKey
+    {
+        IdentifierLookup lookup;
+        bool allow_resolve_from_using;
+
+        bool operator==(const CachedIdentifierKey & other) const
+        {
+            return lookup == other.lookup && allow_resolve_from_using == other.allow_resolve_from_using;
+        }
+    };
+
+    struct CachedIdentifierKeyHash
+    {
+        size_t operator()(const CachedIdentifierKey & key) const
+        {
+            return IdentifierLookupHash{}(key.lookup) ^ (key.allow_resolve_from_using ? 0x9e3779b97f4a7c15ULL : 0);
+        }
+    };
+
+    std::unordered_map<CachedIdentifierKey, IdentifierResolveResult, CachedIdentifierKeyHash> identifier_resolve_cache;
     bool identifier_resolve_cache_enabled = true;
     bool identifier_resolve_cache_force_disabled = false;
 };

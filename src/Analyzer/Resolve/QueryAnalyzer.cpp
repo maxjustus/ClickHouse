@@ -1361,8 +1361,6 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     IdentifierResolveScope & scope,
     IdentifierResolveContext identifier_resolve_context)
 {
-    const bool inside_subquery_function = scope.expressions_in_resolve_process_stack.isInsideSubqueryFunction();
-
     auto it = scope.identifier_in_lookup_process.find(identifier_lookup);
 
     bool already_in_resolve_process = false;
@@ -1373,11 +1371,21 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     }
     else
     {
-        if (!inside_subquery_function)
+        auto cached_result = scope.findCachedIdentifier(identifier_lookup, identifier_resolve_context);
+        if (cached_result)
         {
-            auto cached_result = scope.findCachedIdentifier(identifier_lookup, identifier_resolve_context);
-            if (cached_result)
-                return *cached_result;
+            auto result = *cached_result;
+            result.resolved_identifier = result.resolved_identifier->shallowClone();
+            /// Match the alias-stripping invariant of fresh resolution: any aliased node
+            /// that flows out of identifier resolution must be queued for `removeAlias`
+            /// at end-of-resolveQuery (see line ~5708 and the same registration path at
+            /// line ~2847). Without this, shallow-cloned alias targets keep alias state
+            /// while the cached original gets stripped, leaving structurally-equal
+            /// subtrees with diverging `alias` and tripping comparators that include it
+            /// (e.g. ValidateGroupByColumnsVisitor's `isEqual` for GROUPING args).
+            if (result.resolved_identifier->hasAlias())
+                scope.aliases.node_to_remove_aliases.push_back(result.resolved_identifier);
+            return result;
         }
 
         auto [insert_it, _] = scope.identifier_in_lookup_process.insert({identifier_lookup, IdentifierResolveState()});
@@ -1493,7 +1501,7 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     if (it->second.count == 0)
     {
         scope.identifier_in_lookup_process.erase(it);
-        if (resolve_result.resolved_identifier && !inside_subquery_function)
+        if (resolve_result.resolved_identifier)
             scope.tryCacheIdentifier(identifier_lookup, resolve_result, identifier_resolve_context);
     }
 
@@ -5494,7 +5502,6 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
     resolveQueryJoinTreeNode(query_node_typed.getJoinTree(), scope, visitor);
 
     /// Enable cache after join tree is resolved and all table expressions are registered.
-    /// group_by_use_nulls is handled by not caching nodes in nullable_group_by_keys.
     scope.enableIdentifierCache();
 
     /// Resolve query node sections.
@@ -5512,10 +5519,6 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     if (auto & prewhere_node = query_node_typed.getPrewhere())
     {
-        // allow_resolve_from_using is disabled during prewhere which changes the identifier resolution behavior.
-        // Just disable cache during prewhere instead of having a separate cache namespace for prewhere.
-        scope.disableIdentifierCache();
-
         bool allow_resolve_from_using = scope.allow_resolve_from_using;
         scope.allow_resolve_from_using = false;
         resolveExpressionNode(prewhere_node, scope, false /*allow_lambda_expression*/, false /*allow_table_expression*/);
@@ -5532,8 +5535,6 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
         prewhere_node = prewhere_node->clone();
         ReplaceColumnsVisitor replace_visitor(scope.join_columns_with_changed_types, scope.context);
         replace_visitor.visit(prewhere_node);
-
-        scope.enableIdentifierCache();
     }
 
     if (query_node_typed.getWhere())

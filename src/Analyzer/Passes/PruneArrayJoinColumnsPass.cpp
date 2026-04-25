@@ -314,10 +314,13 @@ public:
             }
         }
 
-        if (column_node->getColumnType()->equals(*new_type))
-            return;
-
-        column_node->setColumnType(new_type);
+        /// Multiple tupleElement function nodes can share the same column_node via cache-hit
+        /// shallow-clone (top-level wrappers differ; child column is shared). We must re-resolve
+        /// every wrapper so its expected argument type matches the (possibly already-updated)
+        /// column type — otherwise later wrappers retain stale expected types and trip the
+        /// post-pass validator.
+        if (!column_node->getColumnType()->equals(*new_type))
+            column_node->setColumnType(new_type);
 
         auto tuple_element_function = FunctionFactory::instance().get("tupleElement", getContext());
         function_node->resolveAsFunction(tuple_element_function->build(function_node->getArgumentColumns()));
