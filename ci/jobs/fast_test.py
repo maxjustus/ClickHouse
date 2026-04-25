@@ -16,6 +16,7 @@ from ci.praktika.info import Info
 from ci.praktika.result import Result
 from ci.praktika.settings import Settings
 from ci.praktika.utils import ContextManager, MetaClasses, Shell, Utils
+from ci.jobs.darwin_skip import DARWIN_SKIP_TESTS
 
 current_directory = Utils.cwd()
 build_dir = f"{current_directory}/ci/tmp/fast_build"
@@ -158,7 +159,7 @@ def parse_args():
 def main():
     args = parse_args()
     if platform.system() == "Darwin":
-        args.skip = list(_load_darwin_skip_tests()) + args.skip
+        args.skip = list(DARWIN_SKIP_TESTS) + args.skip
     stop_watch = Utils.Stopwatch()
 
     stages = list(JobStages)
