@@ -1377,13 +1377,16 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
             auto result = *cached_result;
             auto original = result.resolved_identifier;
             result.resolved_identifier = original->shallowClone();
-            /// `resolved_expressions` is keyed by node pointer, so propagate the cached
-            /// original's projection-name entry to the shallow clone. Without this,
-            /// identifiers that resolve to a LIST (e.g. an alias for `untuple(...)`)
-            /// hit a logical error at the LIST-lookup site in `resolveExpressionNode`
-            /// when the second reference's clone is absent from the map.
+            /// `resolved_expressions` and `node_to_projection_name` are keyed by node
+            /// pointer; propagate the cached original's entries to the shallow clone.
+            /// Without this, identifiers that resolve to a LIST (e.g. an alias for
+            /// `untuple(...)`) hit a logical error at the LIST-lookup site in
+            /// `resolveExpressionNode`, and column/function lookups silently produce
+            /// missing or wrong projection names.
             if (auto expr_it = resolved_expressions.find(original); expr_it != resolved_expressions.end())
                 resolved_expressions.emplace(result.resolved_identifier, expr_it->second);
+            if (auto name_it = node_to_projection_name.find(original); name_it != node_to_projection_name.end())
+                node_to_projection_name.emplace(result.resolved_identifier, name_it->second);
             /// Match the alias-stripping invariant of fresh resolution: any aliased node
             /// that flows out of identifier resolution must be queued for `removeAlias`
             /// at end-of-resolveQuery (see line ~5708 and the same registration path at
