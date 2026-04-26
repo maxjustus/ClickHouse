@@ -228,7 +228,7 @@ std::shared_ptr<FunctionNode> getFlattenedLogicalExpression(const FunctionNode &
 
     auto flattened = std::make_shared<FunctionNode>(function_name);
 
-    flattened->getArguments().getNodes() = std::move(new_arguments);
+    flattened->getMutableArguments() = std::move(new_arguments);
 
     resolveOrdinaryFunctionNodeByName(*flattened, function_name, context);
 
@@ -335,7 +335,7 @@ std::optional<CommonExpressionExtractionResult> tryExtractCommonExpressionsInDis
 
     auto new_or_node = std::make_shared<FunctionNode>("or");
     new_or_node->markAsOperator();
-    new_or_node->getArguments().getNodes() = std::move(new_disjuncts);
+    new_or_node->getMutableArguments() = std::move(new_disjuncts);
 
     resolveOrdinaryFunctionNodeByName(*new_or_node, "or", context);
     return CommonExpressionExtractionResult{ .new_node = new_or_node, .common_expressions = {} };
@@ -351,7 +351,7 @@ std::optional<CommonExpressionExtractionResult> tryExtractCommonExpressions(cons
     if (flattened_or_node)
         or_node = flattened_or_node.get();
 
-    auto & or_argument_nodes = or_node->getArguments().getNodes();
+    auto & or_argument_nodes = or_node->getMutableArguments();
 
     chassert(or_argument_nodes.size() > 1);
 
@@ -445,7 +445,7 @@ std::optional<CommonExpressionExtractionResult> tryExtractCommonExpressions(cons
         {
             auto new_and_node = std::make_shared<FunctionNode>("and");
             new_and_node->markAsOperator();
-            new_and_node->getArguments().getNodes() = std::move(filtered_and_arguments);
+            new_and_node->getMutableArguments() = std::move(filtered_and_arguments);
             resolveOrdinaryFunctionNodeByName(*new_and_node, "and", context);
 
             insertIfNotPresentInSet(new_or_arguments_set, new_or_arguments, std::move(new_and_node));
@@ -468,7 +468,7 @@ std::optional<CommonExpressionExtractionResult> tryExtractCommonExpressions(cons
 
     auto new_or_node = std::make_shared<FunctionNode>("or");
     new_or_node->markAsOperator();
-    new_or_node->getArguments().getNodes() = std::move(new_or_arguments);
+    new_or_node->getMutableArguments() = std::move(new_or_arguments);
 
     resolveOrdinaryFunctionNodeByName(*new_or_node, "or", context);
 
@@ -499,7 +499,7 @@ void tryOptimizeCommonExpressionsInOr(QueryTreeNodePtr & node, const ContextPtr 
             // and the new_node, if it is not nullptr.
             auto new_function_node = std::make_shared<FunctionNode>("and");
             new_function_node->markAsOperator();
-            new_function_node->getArguments().getNodes() = std::move(new_root_arguments);
+            new_function_node->getMutableArguments() = std::move(new_root_arguments);
             auto and_function_resolver = FunctionFactory::instance().get("and", context);
             new_function_node->resolveAsFunction(and_function_resolver);
             new_root_node = std::move(new_function_node);
@@ -547,7 +547,7 @@ void tryOptimizeCommonExpressionsInAnd(QueryTreeNodePtr & node, const ContextPtr
 
     auto and_function_node = std::make_shared<FunctionNode>("and");
     and_function_node->markAsOperator();
-    and_function_node->getArguments().getNodes() = std::move(new_top_level_arguments);
+    and_function_node->getMutableArguments() = std::move(new_top_level_arguments);
     auto and_function_resolver = FunctionFactory::instance().get("and", context);
     and_function_node->resolveAsFunction(and_function_resolver);
     QueryTreeNodePtr new_root_node = and_function_node;
@@ -819,7 +819,7 @@ private:
         /// Rebuild OR function
         auto function_node = std::make_shared<FunctionNode>("or");
         function_node->markAsOperator();
-        function_node->getArguments().getNodes() = std::move(new_or_operands);
+        function_node->getMutableArguments() = std::move(new_or_operands);
         resolveOrdinaryFunctionNodeByName(*function_node, "or", context);
         return function_node;
     }
@@ -1055,7 +1055,7 @@ private:
             not_in_arguments.push_back(expression.node);
             not_in_arguments.push_back(std::move(rhs_node));
 
-            not_in_function->getArguments().getNodes() = std::move(not_in_arguments);
+            not_in_function->getMutableArguments() = std::move(not_in_arguments);
             not_in_function->resolveAsFunction(not_in_function_resolver);
 
             and_operands.push_back(std::move(not_in_function));
@@ -1236,8 +1236,9 @@ private:
 
                         const auto and_node = std::make_shared<FunctionNode>(compare_function_name);
                         and_node->markAsOperator();
-                        and_node->getArguments().getNodes().push_back(left.first->clone());
-                        and_node->getArguments().getNodes().push_back(constant->clone());
+                        auto & and_node_args = and_node->getMutableArguments();
+                        and_node_args.push_back(left.first->clone());
+                        and_node_args.push_back(constant->clone());
                         and_node->resolveAsFunction(
                             FunctionFactory::instance().get(compare_function_name, getContext()));
                         function_node.getMutableArguments().push_back(and_node);
@@ -1360,7 +1361,7 @@ private:
             in_arguments.push_back(expression.node);
             in_arguments.push_back(std::move(rhs_node));
 
-            in_function->getArguments().getNodes() = std::move(in_arguments);
+            in_function->getMutableArguments() = std::move(in_arguments);
             in_function->resolveAsFunction(in_function_resolver);
 
             DataTypePtr result_type = in_function->getResultType();
@@ -1457,7 +1458,7 @@ private:
             auto not_resolver = FunctionFactory::instance().get("not", getContext());
             const auto not_node = std::make_shared<FunctionNode>("not");
             not_node->markAsOperator();
-            auto & arguments = not_node->getArguments().getNodes();
+            auto & arguments = not_node->getMutableArguments();
             arguments.reserve(1);
             arguments.push_back(replacement_function);
             not_node->resolveAsFunction(not_resolver->build(not_node->getArgumentColumns()));

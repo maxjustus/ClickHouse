@@ -36,7 +36,7 @@ public:
 
         if (!ordinary_grouping)
         {
-            auto & arguments = function->getArguments().getNodes();
+            auto & arguments = function->getMutableArguments();
 
             if (arguments.empty())
                 throw Exception(ErrorCodes::LOGICAL_ERROR, "Grouping function specialization must have arguments");

@@ -786,7 +786,7 @@ void QueryAnalyzer::validateJoinTableExpressionWithoutAlias(const QueryTreeNodeP
                         scope.scope_node->formatASTForErrorMessage());
 }
 
-std::pair<bool, UInt64> QueryAnalyzer::recursivelyCollectMaxOrdinaryExpressions(QueryTreeNodePtr & node, QueryTreeNodes & into)
+std::pair<bool, UInt64> QueryAnalyzer::recursivelyCollectMaxOrdinaryExpressions(const QueryTreeNodePtr & node, QueryTreeNodes & into)
 {
     checkStackSize();
 
@@ -809,7 +809,7 @@ std::pair<bool, UInt64> QueryAnalyzer::recursivelyCollectMaxOrdinaryExpressions(
     UInt64 pushed_children = 0;
     bool has_aggregate = false;
 
-    for (auto & child : function->getArguments().getNodes())
+    for (const auto & child : function->getArguments().getNodes())
     {
         auto [child_has_aggregate, child_pushed_children] = recursivelyCollectMaxOrdinaryExpressions(child, into);
         has_aggregate |= child_has_aggregate;
@@ -1827,8 +1827,8 @@ QueryAnalyzer::QueryTreeNodesWithNames QueryAnalyzer::resolveQualifiedMatcher(Qu
                 continue;
 
             auto get_subcolumn_function = std::make_shared<FunctionNode>("getSubcolumn");
-            get_subcolumn_function->getArguments().getNodes().push_back(expression_query_tree_node);
-            get_subcolumn_function->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(element_name));
+            get_subcolumn_function->getMutableArguments().push_back(expression_query_tree_node);
+            get_subcolumn_function->getMutableArguments().push_back(std::make_shared<ConstantNode>(element_name));
 
             QueryTreeNodePtr function_query_node = get_subcolumn_function;
             resolveFunction(function_query_node, scope);
@@ -2274,7 +2274,7 @@ ProjectionNames QueryAnalyzer::resolveMatcher(QueryTreeNodePtr & matcher_node, I
                 {
                     auto function_to_resolve_untyped = expression_node->clone();
                     auto & function_to_resolve_typed = function_to_resolve_untyped->as<FunctionNode &>();
-                    function_to_resolve_typed.getArguments().getNodes().push_back(node);
+                    function_to_resolve_typed.getMutableArguments().push_back(node);
                     node_projection_names = resolveFunction(function_to_resolve_untyped, scope);
                     node = function_to_resolve_untyped;
                 }
@@ -2455,7 +2455,7 @@ ProjectionNames QueryAnalyzer::resolveMatcher(QueryTreeNodePtr & matcher_node, I
 
                         if (auto * function_node = current->as<FunctionNode>())
                         {
-                            auto & arguments = function_node->getArguments().getNodes();
+                            auto & arguments = function_node->getMutableArguments();
                             for (auto & arg : arguments)
                                 replace_recursive(arg);
 

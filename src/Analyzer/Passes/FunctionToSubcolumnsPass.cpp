@@ -118,7 +118,7 @@ void optimizeFunctionStringEmpty(QueryTreeNodePtr &, FunctionNode & function_nod
     NameAndTypePair column{ctx.column.name + ".size", std::make_shared<DataTypeUInt64>()};
     if (sourceHasColumn(ctx.column_source, column.name) || !canOptimizeToSubcolumn(ctx.column_source, column.name))
         return;
-    auto & function_arguments_nodes = function_node.getArguments().getNodes();
+    auto & function_arguments_nodes = function_node.getMutableArguments();
 
     function_arguments_nodes.clear();
     function_arguments_nodes.push_back(std::make_shared<ColumnNode>(column, ctx.column_source));
@@ -162,7 +162,7 @@ void optimizeFunctionEmpty(QueryTreeNodePtr &, FunctionNode & function_node, Col
             return;
     }
 
-    auto & function_arguments_nodes = function_node.getArguments().getNodes();
+    auto & function_arguments_nodes = function_node.getMutableArguments();
 
     function_arguments_nodes.clear();
     function_arguments_nodes.push_back(std::make_shared<ColumnNode>(column, ctx.column_source));
@@ -315,15 +315,15 @@ void optimizeDistinctJSONPaths(QueryTreeNodePtr & node, FunctionNode &, ColumnCo
 
     auto new_column_node = std::make_shared<ColumnNode>(column, ctx.column_source);
     auto function_array_join_node = std::make_shared<FunctionNode>("arrayJoin");
-    function_array_join_node->getArguments().getNodes().push_back(std::move(new_column_node));
+    function_array_join_node->getMutableArguments().push_back(std::move(new_column_node));
     resolveOrdinaryFunctionNodeByName(*function_array_join_node, "arrayJoin", ctx.context);
 
     auto function_group_array_distinct_node = std::make_shared<FunctionNode>("groupArrayDistinct");
-    function_group_array_distinct_node->getArguments().getNodes().push_back(std::move(function_array_join_node));
+    function_group_array_distinct_node->getMutableArguments().push_back(std::move(function_array_join_node));
     resolveAggregateFunctionNodeByName(*function_group_array_distinct_node, "groupArrayDistinct");
 
     auto function_array_sort_node = std::make_shared<FunctionNode>("arraySort");
-    function_array_sort_node->getArguments().getNodes().push_back(std::move(function_group_array_distinct_node));
+    function_array_sort_node->getMutableArguments().push_back(std::move(function_group_array_distinct_node));
     resolveOrdinaryFunctionNodeByName(*function_array_sort_node, "arraySort", ctx.context);
 
     node = std::move(function_array_sort_node);
@@ -396,7 +396,7 @@ std::map<std::pair<TypeIndex, String>, NodeToSubcolumnTransformer> node_transfor
             NameAndTypePair column{ctx.column.name + ".keys", std::make_shared<DataTypeArray>(data_type_map.getKeyType())};
             if (sourceHasColumn(ctx.column_source, column.name) || !canOptimizeToSubcolumn(ctx.column_source, column.name))
                 return;
-            auto & function_arguments_nodes = function_node.getArguments().getNodes();
+            auto & function_arguments_nodes = function_node.getMutableArguments();
 
             auto has_function_argument = std::make_shared<ColumnNode>(column, ctx.column_source);
             function_arguments_nodes[0] = std::move(has_function_argument);
@@ -425,13 +425,13 @@ std::map<std::pair<TypeIndex, String>, NodeToSubcolumnTransformer> node_transfor
                     return;
             }
 
-            auto & function_arguments_nodes = function_node.getArguments().getNodes();
+            auto & function_arguments_nodes = function_node.getMutableArguments();
 
             auto new_column_node = std::make_shared<ColumnNode>(column, ctx.column_source);
             auto function_node_not = std::make_shared<FunctionNode>("not");
             function_node_not->markAsOperator();
 
-            function_node_not->getArguments().getNodes().push_back(std::move(new_column_node));
+            function_node_not->getMutableArguments().push_back(std::move(new_column_node));
             resolveOrdinaryFunctionNodeByName(*function_node_not, "not", ctx.context);
 
             function_arguments_nodes = {std::move(function_node_not)};
@@ -479,7 +479,7 @@ std::map<std::pair<TypeIndex, String>, NodeToSubcolumnTransformer> node_transfor
                     return;
             }
 
-            auto & function_arguments_nodes = function_node.getArguments().getNodes();
+            auto & function_arguments_nodes = function_node.getMutableArguments();
 
             function_arguments_nodes = {std::make_shared<ColumnNode>(column, ctx.column_source)};
             resolveOrdinaryFunctionNodeByName(function_node, "not", ctx.context);

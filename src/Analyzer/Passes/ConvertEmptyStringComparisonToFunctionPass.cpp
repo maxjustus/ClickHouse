@@ -78,7 +78,7 @@ public:
         const String replacement_func = (func_name == "equals") ? "empty" : "notEmpty";
 
         auto replacement_node = std::make_shared<FunctionNode>(replacement_func);
-        replacement_node->getArguments().getNodes().push_back(expr_node);
+        replacement_node->getMutableArguments().push_back(expr_node);
 
         resolveOrdinaryFunctionNodeByName(*replacement_node, replacement_func, getContext());
 

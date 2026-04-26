@@ -64,7 +64,7 @@ QueryTreeNodePtr normalizeAtom(const QueryTreeNodePtr & atom, const ContextPtr &
             auto inverted_node = function_node->clone();
             auto * inverted_function_node = inverted_node->as<FunctionNode>();
             auto function_resolver = FunctionFactory::instance().get(it->second, context);
-            auto & arguments = inverted_function_node->getArguments().getNodes();
+            auto & arguments = inverted_function_node->getMutableArguments();
             chassert(arguments.size() == 2);
             std::swap(arguments[0], arguments[1]);
             inverted_function_node->resolveAsFunction(function_resolver);

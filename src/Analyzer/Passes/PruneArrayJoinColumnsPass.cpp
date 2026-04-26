@@ -193,7 +193,7 @@ void pruneNestedFunctionArguments(
     const ContextPtr & context,
     std::unordered_map<UInt64, UInt64> & index_remap)
 {
-    auto & nested_args = function_node.getArguments().getNodes();
+    auto & nested_args = function_node.getMutableArguments();
     const auto & subcolumn_names = expr_usage.nested_subcolumn_names;
     size_t num_subcolumns = subcolumn_names.size();
 
@@ -269,7 +269,7 @@ public:
         if (!function_node || function_node->getFunctionName() != "tupleElement")
             return;
 
-        auto & arguments = function_node->getArguments().getNodes();
+        auto & arguments = function_node->getMutableArguments();
         if (arguments.size() < 2)
             return;
 

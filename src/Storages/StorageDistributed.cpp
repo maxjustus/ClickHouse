@@ -808,7 +808,7 @@ public:
                 return;
 
             auto result_function = std::make_shared<FunctionNode>(getGlobalInFunctionNameForLocalInFunctionName(function_node->getFunctionName()));
-            result_function->getArguments().getNodes() = std::move(function_node->getArguments().getNodes());
+            result_function->getMutableArguments() = std::move(function_node->getMutableArguments());
             resolveOrdinaryFunctionNodeByName(*result_function, result_function->getFunctionName(), getContext());
             node = result_function;
         }

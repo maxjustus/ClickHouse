@@ -252,11 +252,11 @@ public:
 
         if (dict_side == Side::LHS)
         {
-            attr_comparison_function_node->getArguments().getNodes() = { attr_col_node_casted, arguments[1] };
+            attr_comparison_function_node->getMutableArguments() = { attr_col_node_casted, arguments[1] };
         }
         else
         {
-            attr_comparison_function_node->getArguments().getNodes() = { arguments[0], attr_col_node_casted };
+            attr_comparison_function_node->getMutableArguments() = { arguments[0], attr_col_node_casted };
         }
         resolveOrdinaryFunctionNodeByName(*attr_comparison_function_node, attr_comparison_function_name, getContext());
 
@@ -275,7 +275,7 @@ public:
         auto in_function_node = std::make_shared<FunctionNode>("in");
         in_function_node->markAsOperator();
         QueryTreeNodePtr querytree_subquery_node = subquery_node;
-        in_function_node->getArguments().getNodes() = {dictget_function_info.key_expr_node, querytree_subquery_node};
+        in_function_node->getMutableArguments() = {dictget_function_info.key_expr_node, querytree_subquery_node};
         resolveOrdinaryFunctionNodeByName(*in_function_node, "in", getContext());
 
         /// Preserve the original result type of the comparison node.

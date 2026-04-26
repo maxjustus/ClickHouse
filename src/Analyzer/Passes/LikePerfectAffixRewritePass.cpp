@@ -110,7 +110,7 @@ private:
     {
         auto op_function = std::make_shared<FunctionNode>(op);
         auto op_resolver = FunctionFactory::instance().get(op, getContext());
-        op_function->getArguments().getNodes() = {std::forward<Args>(operands)...};
+        op_function->getMutableArguments() = {std::forward<Args>(operands)...};
         op_function->resolveAsFunction(op_resolver);
         return op_function;
     }

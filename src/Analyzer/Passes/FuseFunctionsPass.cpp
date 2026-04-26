@@ -153,7 +153,7 @@ QueryTreeNodePtr createResolvedFunction(const ContextPtr & context, const String
     auto function_node = std::make_shared<FunctionNode>(name);
 
     auto function = FunctionFactory::instance().get(name, context);
-    function_node->getArguments().getNodes() = std::move(arguments);
+    function_node->getMutableArguments() = std::move(arguments);
     function_node->resolveAsFunction(function->build(function_node->getArgumentColumns()));
     return function_node;
 }
@@ -170,7 +170,7 @@ FunctionNodePtr createResolvedAggregateFunction(
             parameter_nodes.emplace_back(std::make_shared<ConstantNode>(param));
         function_node->getParameters().getNodes() = std::move(parameter_nodes);
     }
-    function_node->getArguments().getNodes() = { argument };
+    function_node->getMutableArguments() = { argument };
 
     AggregateFunctionProperties properties;
     auto aggregate_function = AggregateFunctionFactory::instance().get(name, NullsAction::EMPTY, {argument->getResultType()}, parameters, properties);

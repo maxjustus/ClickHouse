@@ -38,7 +38,7 @@ public:
         if (!array_exists_function_node || array_exists_function_node->getFunctionName() != "arrayExists")
             return;
 
-        auto & array_exists_function_arguments_nodes = array_exists_function_node->getArguments().getNodes();
+        auto & array_exists_function_arguments_nodes = array_exists_function_node->getMutableArguments();
         if (array_exists_function_arguments_nodes.size() != 2)
             return;
 

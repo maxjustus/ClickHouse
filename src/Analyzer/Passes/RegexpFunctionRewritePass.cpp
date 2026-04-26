@@ -64,7 +64,7 @@ private:
 
     bool handleReplaceRegexpAll(FunctionNode & function_node)
     {
-        auto & function_node_arguments_nodes = function_node.getArguments().getNodes();
+        const auto & function_node_arguments_nodes = function_node.getArguments().getNodes();
         if (function_node_arguments_nodes.size() != 3)
             return false;
 
@@ -100,7 +100,7 @@ private:
 
     void handleExtract(FunctionNode & function_node)
     {
-        auto & function_node_arguments_nodes = function_node.getArguments().getNodes();
+        const auto & function_node_arguments_nodes = function_node.getArguments().getNodes();
         if (function_node_arguments_nodes.size() != 2)
             return;
 
@@ -132,7 +132,7 @@ private:
                 regexp = regexp.substr(3);
             if (ends_with_unescaped_dot_star_dollar && regexp.ends_with(".*$"))
                 regexp = regexp.substr(0, regexp.size() - 3);
-            function_node_arguments_nodes[1] = std::make_shared<ConstantNode>(std::move(regexp));
+            function_node.getMutableArguments()[1] = std::make_shared<ConstantNode>(std::move(regexp));
         }
     }
 };

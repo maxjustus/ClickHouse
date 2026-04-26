@@ -198,7 +198,7 @@ private:
     {
         auto function = FunctionFactory::instance().get(function_name, getContext());
         const auto function_node = std::make_shared<FunctionNode>(function_name);
-        auto & new_arguments = function_node->getArguments().getNodes();
+        auto & new_arguments = function_node->getMutableArguments();
         new_arguments.reserve(sizeof...(args));
         (new_arguments.push_back(std::forward<Args>(args)), ...);
         function_node->resolveAsFunction(function->build(function_node->getArgumentColumns()));

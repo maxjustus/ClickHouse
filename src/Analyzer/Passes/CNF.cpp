@@ -38,7 +38,7 @@ template <typename... Args>
 QueryTreeNodePtr createFunctionNode(const FunctionOverloadResolverPtr & function_resolver, Args &&... args)
 {
     auto function_node = std::make_shared<FunctionNode>(function_resolver->getName());
-    auto & new_arguments = function_node->getArguments().getNodes();
+    auto & new_arguments = function_node->getMutableArguments();
     new_arguments.reserve(sizeof...(args));
     (new_arguments.push_back(std::forward<Args>(args)), ...);
     function_node->resolveAsFunction(function_resolver);
@@ -99,7 +99,7 @@ public:
             assert(name == "not");
         }
 
-        auto & arguments = function_node->getArguments().getNodes();
+        auto & arguments = function_node->getMutableArguments();
         for (auto & argument : arguments)
             visit(argument);
     }
@@ -141,14 +141,14 @@ public:
                     function_node->resolveAsFunction(and_function_resolver);
             }
 
-            auto & arguments = function_node->getArguments().getNodes();
+            auto & arguments = function_node->getMutableArguments();
             for (auto & argument : arguments)
                 visit(argument, add_negation);
             return;
         }
 
         assert(function_name == "not");
-        auto & arguments = function_node->getArguments().getNodes();
+        auto & arguments = function_node->getMutableArguments();
         assert(arguments.size() == 1);
         node = arguments[0];
         visit(node, !add_negation);
@@ -185,7 +185,7 @@ public:
 
         if (name == "or" || name == "and")
         {
-            auto & arguments = function_node->getArguments().getNodes();
+            auto & arguments = function_node->getMutableArguments();
             for (auto & argument : arguments)
             {
                 if (!visit(argument, num_atoms))
@@ -195,7 +195,7 @@ public:
 
         if (name == "or")
         {
-            auto & arguments = function_node->getArguments().getNodes();
+            auto & arguments = function_node->getMutableArguments();
             assert(arguments.size() == 2);
 
             size_t and_node_id = arguments.size();
@@ -212,7 +212,7 @@ public:
                 return true;
 
             auto & other_node = arguments[1 - and_node_id];
-            auto & and_function_arguments = arguments[and_node_id]->as<FunctionNode &>().getArguments().getNodes();
+            auto & and_function_arguments = arguments[and_node_id]->as<FunctionNode &>().getMutableArguments();
 
             auto lhs = createFunctionNode(or_resolver, other_node->clone(), std::move(and_function_arguments[0]));
             num_atoms += countAtoms(other_node);
@@ -262,7 +262,7 @@ private:
 
         if (name == "and")
         {
-            auto & arguments = function_node->getArguments().getNodes();
+            auto & arguments = function_node->getMutableArguments();
             for (auto & argument : arguments)
             {
                 CNF::OrGroup argument_or_group;
@@ -273,14 +273,14 @@ private:
         }
         else if (name == "or")
         {
-            auto & arguments = function_node->getArguments().getNodes();
+            auto & arguments = function_node->getMutableArguments();
             for (auto & argument : arguments)
                 visitImpl(argument, or_group);
         }
         else
         {
             assert(name == "not");
-            auto & arguments = function_node->getArguments().getNodes();
+            auto & arguments = function_node->getMutableArguments();
             or_group.insert(CNFAtomicFormula{true, std::move(arguments[0])});
         }
     }
@@ -567,7 +567,7 @@ QueryTreeNodePtr CNF::toQueryTree() const
 
             auto or_function = std::make_shared<FunctionNode>("or");
             or_function->markAsOperator();
-            or_function->getArguments().getNodes() = std::move(or_arguments);
+            or_function->getMutableArguments() = std::move(or_arguments);
             or_function->resolveAsFunction(or_resolver);
 
             and_arguments.push_back(std::move(or_function));
@@ -579,7 +579,7 @@ QueryTreeNodePtr CNF::toQueryTree() const
 
     auto and_function = std::make_shared<FunctionNode>("and");
     and_function->markAsOperator();
-    and_function->getArguments().getNodes() = std::move(and_arguments);
+    and_function->getMutableArguments() = std::move(and_arguments);
     and_function->resolveAsFunction(and_resolver);
 
     return and_function;

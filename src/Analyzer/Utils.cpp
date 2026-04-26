@@ -343,8 +343,9 @@ QueryTreeNodePtr buildCastFunction(const QueryTreeNodePtr & expression,
 
     std::string cast_function_name = "_CAST";
     auto cast_function_node = std::make_shared<FunctionNode>(cast_function_name);
-    cast_function_node->getArguments().getNodes().push_back(expression);
-    cast_function_node->getArguments().getNodes().push_back(std::move(cast_type_constant_node));
+    auto & cast_args = cast_function_node->getMutableArguments();
+    cast_args.push_back(expression);
+    cast_args.push_back(std::move(cast_type_constant_node));
 
     if (resolve)
     {
@@ -971,7 +972,7 @@ QueryTreeNodePtr createCastFunction(QueryTreeNodePtr node, DataTypePtr result_ty
     QueryTreeNodes arguments{ std::move(node), std::move(enum_literal_node) };
 
     auto function_node = std::make_shared<FunctionNode>("_CAST");
-    function_node->getArguments().getNodes() = std::move(arguments);
+    function_node->getMutableArguments() = std::move(arguments);
 
     function_node->resolveAsFunction(cast_function->build(function_node->getArgumentColumns()));
 
@@ -1202,8 +1203,9 @@ void removeExpressionsThatDoNotDependOnTableIdentifiers(
         return;
     }
 
-    function->getArguments().getNodes().clear();
-    std::ranges::move(conjunctions, std::back_inserter(function->getArguments().getNodes()));
+    auto & function_args = function->getMutableArguments();
+    function_args.clear();
+    std::ranges::move(conjunctions, std::back_inserter(function_args));
 
     const auto function_impl = FunctionFactory::instance().get("and", context);
     function->resolveAsFunction(function_impl->build(function->getArgumentColumns()));

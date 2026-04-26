@@ -126,8 +126,9 @@ public:
         {
             auto cast_type_constant = std::make_shared<ConstantNode>(expected_ref_vec_type->getName());
             auto cast_function = std::make_shared<FunctionNode>("_CAST");
-            cast_function->getArguments().getNodes().push_back(ref_vec_node);
-            cast_function->getArguments().getNodes().push_back(cast_type_constant);
+            auto & cast_args = cast_function->getMutableArguments();
+            cast_args.push_back(ref_vec_node);
+            cast_args.push_back(cast_type_constant);
 
             auto cast_function_builder = FunctionFactory::instance().get("_CAST", getContext());
             cast_function->resolveAsFunction(cast_function_builder->build(cast_function->getArgumentColumns()));

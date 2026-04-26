@@ -512,28 +512,32 @@ QueryTreeNodePtr QueryTreeBuilder::buildSelectExpression(
         {
             /// expr 3
             auto expr_3 = std::make_shared<FunctionNode>("minus");
-            expr_3->getArguments().getNodes().push_back(buildExpression(select_limit, current_context));
-            expr_3->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(offset));
+            auto & expr_3_args = expr_3->getMutableArguments();
+            expr_3_args.push_back(buildExpression(select_limit, current_context));
+            expr_3_args.push_back(std::make_shared<ConstantNode>(offset));
 
             /// expr 2
             auto expr_2 = std::make_shared<FunctionNode>("least");
-            expr_2->getArguments().getNodes().push_back(expr_3->clone());
-            expr_2->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(limit));
+            auto & expr_2_args = expr_2->getMutableArguments();
+            expr_2_args.push_back(expr_3->clone());
+            expr_2_args.push_back(std::make_shared<ConstantNode>(limit));
 
             /// expr 0
             auto expr_0 = std::make_shared<FunctionNode>("greaterOrEquals");
-            expr_0->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(offset));
-            expr_0->getArguments().getNodes().push_back(buildExpression(select_limit, current_context));
+            auto & expr_0_args = expr_0->getMutableArguments();
+            expr_0_args.push_back(std::make_shared<ConstantNode>(offset));
+            expr_0_args.push_back(buildExpression(select_limit, current_context));
 
             /// expr 1
             auto expr_1 = std::make_shared<ConstantNode>(limit > 0);
 
             auto function_node = std::make_shared<FunctionNode>("multiIf");
-            function_node->getArguments().getNodes().push_back(expr_0);
-            function_node->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(0));
-            function_node->getArguments().getNodes().push_back(expr_1);
-            function_node->getArguments().getNodes().push_back(expr_2);
-            function_node->getArguments().getNodes().push_back(expr_3);
+            auto & multi_if_args = function_node->getMutableArguments();
+            multi_if_args.push_back(expr_0);
+            multi_if_args.push_back(std::make_shared<ConstantNode>(0));
+            multi_if_args.push_back(expr_1);
+            multi_if_args.push_back(expr_2);
+            multi_if_args.push_back(expr_3);
 
             current_query_tree->getLimit() = std::move(function_node);
         }
@@ -546,8 +550,9 @@ QueryTreeNodePtr QueryTreeBuilder::buildSelectExpression(
     if (select_offset && offset)
     {
         auto function_node = std::make_shared<FunctionNode>("plus");
-        function_node->getArguments().getNodes().push_back(buildExpression(select_offset, current_context));
-        function_node->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(offset));
+        auto & plus_args = function_node->getMutableArguments();
+        plus_args.push_back(buildExpression(select_offset, current_context));
+        plus_args.push_back(std::make_shared<ConstantNode>(offset));
         current_query_tree->getOffset() = std::move(function_node);
     }
     else if (offset)
@@ -761,8 +766,9 @@ QueryTreeNodePtr QueryTreeBuilder::buildExpression(const ASTPtr & expression, co
                 if (function->arguments)
                 {
                     const auto & function_arguments_list = function->arguments->as<ASTExpressionList>()->children;
+                    auto & fn_args = function_node->getMutableArguments();
                     for (const auto & argument : function_arguments_list)
-                        function_node->getArguments().getNodes().push_back(buildExpression(argument, context));
+                        fn_args.push_back(buildExpression(argument, context));
                 }
 
                 if (function->isWindowFunction())
@@ -1305,7 +1311,7 @@ QueryTreeNodePtr QueryTreeBuilder::setSecondArgumentAsParameter(const ASTFunctio
     function_node->setNullsAction(function->getNullsAction());
 
     function_node->getParameters().getNodes().push_back(buildExpression(function->arguments->children[1], context)); // Separator
-    function_node->getArguments().getNodes().push_back(buildExpression(first_arg, context)); // Column to concatenate
+    function_node->getMutableArguments().push_back(buildExpression(first_arg, context)); // Column to concatenate
 
     if (function->isWindowFunction())
     {

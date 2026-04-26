@@ -45,7 +45,7 @@ public:
         if (lower_function_name != "sum" && (lower_function_name != "sumif" || !function_name.ends_with("If")))
             return;
 
-        auto & function_node_arguments_nodes = function_node->getArguments().getNodes();
+        auto & function_node_arguments_nodes = function_node->getMutableArguments();
 
         /// Rewrite `sumIf(1, cond)` into `countIf(cond)`
         if (lower_function_name == "sumif")
@@ -141,7 +141,7 @@ public:
             auto not_function = std::make_shared<FunctionNode>("not");
             not_function->markAsOperator();
 
-            auto & not_function_arguments = not_function->getArguments().getNodes();
+            auto & not_function_arguments = not_function->getMutableArguments();
             not_function_arguments.push_back(nested_if_function_arguments_nodes[0]);
 
             not_function->resolveAsFunction(FunctionFactory::instance().get("not", getContext())->build(not_function->getArgumentColumns()));
@@ -165,7 +165,7 @@ private:
     {
         auto multiply_function_node = std::make_shared<FunctionNode>("multiply");
         multiply_function_node->markAsOperator();
-        auto & multiply_arguments_nodes = multiply_function_node->getArguments().getNodes();
+        auto & multiply_arguments_nodes = multiply_function_node->getMutableArguments();
         multiply_arguments_nodes.push_back(std::move(left));
         multiply_arguments_nodes.push_back(std::move(right));
 

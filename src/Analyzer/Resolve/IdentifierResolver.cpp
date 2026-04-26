@@ -78,7 +78,7 @@ QueryTreeNodePtr IdentifierResolver::convertJoinedColumnTypeToNullIfNeeded(
         /// arguments in Nullable and re-resolve the function to get the correct result type.
         auto function_clone = resolved_identifier->clone();
         auto & function_node = function_clone->as<FunctionNode &>();
-        auto & arguments = function_node.getArguments().getNodes();
+        auto & arguments = function_node.getMutableArguments();
 
         bool any_changed = false;
         for (auto & arg : arguments)
@@ -149,7 +149,7 @@ static FunctionNodePtr wrapExpressionNodeInFunctionWithSecondConstantStringArgum
 
     auto constant_node = std::make_shared<ConstantNode>(std::move(constant_value));
 
-    auto & get_subcolumn_function_arguments_nodes = function_node->getArguments().getNodes();
+    auto & get_subcolumn_function_arguments_nodes = function_node->getMutableArguments();
 
     get_subcolumn_function_arguments_nodes.reserve(2);
     get_subcolumn_function_arguments_nodes.push_back(std::move(expression));
@@ -637,7 +637,7 @@ IdentifierResolveResult IdentifierResolver::tryResolveIdentifierFromStorage(
         if (!nested_types.empty())
         {
             auto nested_function_node = std::make_shared<FunctionNode>("nested");
-            auto & nested_function_node_arguments = nested_function_node->getArguments().getNodes();
+            auto & nested_function_node_arguments = nested_function_node->getMutableArguments();
 
             auto nested_function_names_array_type = std::make_shared<DataTypeArray>(std::make_shared<DataTypeString>());
             auto nested_function_names_constant_node = std::make_shared<ConstantNode>(std::move(nested_names_array),
@@ -976,7 +976,7 @@ QueryTreeNodePtr createProjectionForUsing(const ColumnNode & using_column_node, 
     String function_name("firstNonDefault");
 
     auto function_node = std::make_shared<FunctionNode>(function_name);
-    function_node->getArguments().getNodes() = std::move(arguments);
+    function_node->getMutableArguments() = std::move(arguments);
 
     auto merge_function = FunctionFactory::instance().get(function_name, scope.context);
     function_node->resolveAsFunction(merge_function->build(function_node->getArgumentColumns()));

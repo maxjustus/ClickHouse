@@ -433,7 +433,7 @@ QueryTreeNodePtr mergeConditionNodes(const QueryTreeNodes & condition_nodes, con
     auto function_node = std::make_shared<FunctionNode>("and");
     function_node->markAsOperator();
     auto and_function = FunctionFactory::instance().get("and", context);
-    function_node->getArguments().getNodes() = condition_nodes;
+    function_node->getMutableArguments() = condition_nodes;
     function_node->resolveAsFunction(and_function->build(function_node->getArgumentColumns()));
 
     return function_node;

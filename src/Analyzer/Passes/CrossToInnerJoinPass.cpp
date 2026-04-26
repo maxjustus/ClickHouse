@@ -371,8 +371,9 @@ private:
 
         auto function_node = std::make_shared<FunctionNode>("and");
         function_node->markAsOperator();
+        auto & args = function_node->getMutableArguments();
         for (const auto & node : nodes)
-            function_node->getArguments().getNodes().push_back(node);
+            args.push_back(node);
 
         const auto & function = createInternalFunctionAndOverloadResolver();
         function_node->resolveAsFunction(function->build(function_node->getArgumentColumns()));

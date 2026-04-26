@@ -309,7 +309,7 @@ Analyzer::CNF::OrGroup createIndexHintGroup(
                 {
                     auto helper_node = function_node->clone();
                     auto & helper_function_node = helper_node->as<FunctionNode &>();
-                    helper_function_node.getArguments().getNodes()[index] = primary_key_node->clone();
+                    helper_function_node.getMutableArguments()[index] = primary_key_node->clone();
                     auto reverse_function_name = getReverseRelationMap().at(mostStrict(expected_result, actual_result));
                     helper_function_node.resolveAsFunction(FunctionFactory::instance().get(reverse_function_name, context));
                     result.insert(Analyzer::CNFAtomicFormula{atom.negative, std::move(helper_node)});
@@ -365,7 +365,7 @@ void addIndexConstraint(Analyzer::CNF & cnf, const QueryTreeNodes & table_expres
         {
             Analyzer::CNF::OrGroup new_group;
             auto index_hint_node = std::make_shared<FunctionNode>("indexHint");
-            index_hint_node->getArguments().getNodes().push_back(Analyzer::CNF{std::move(and_group)}.toQueryTree());
+            index_hint_node->getMutableArguments().push_back(Analyzer::CNF{std::move(and_group)}.toQueryTree());
             index_hint_node->resolveAsFunction(FunctionFactory::instance().get("indexHint", context));
             new_group.insert({false, QueryTreeNodePtrWithHash{std::move(index_hint_node)}});
 

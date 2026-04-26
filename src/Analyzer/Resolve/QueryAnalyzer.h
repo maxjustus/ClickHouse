@@ -165,7 +165,7 @@ private:
 
     static void checkDuplicateTableNamesOrAliasForPasteJoin(const JoinNode & join_node, IdentifierResolveScope & scope);
 
-    static std::pair<bool, UInt64> recursivelyCollectMaxOrdinaryExpressions(QueryTreeNodePtr & node, QueryTreeNodes & into);
+    static std::pair<bool, UInt64> recursivelyCollectMaxOrdinaryExpressions(const QueryTreeNodePtr & node, QueryTreeNodes & into);
 
     static void expandGroupByAll(QueryNode & query_tree_node_typed);
 

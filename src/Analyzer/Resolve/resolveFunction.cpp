@@ -106,7 +106,7 @@ bool isNullConstant(const QueryTreeNodePtr & node)
 QueryTreeNodePtr createNotWrapper(QueryTreeNodePtr node)
 {
     auto not_fn = std::make_shared<FunctionNode>("not");
-    not_fn->getArguments().getNodes().push_back(node);
+    not_fn->getMutableArguments().push_back(node);
     return not_fn;
 }
 
@@ -118,18 +118,19 @@ std::pair<QueryTreeNodePtr, ProjectionNames> QueryAnalyzer::makeNullSafeHas(
     IdentifierResolveScope & scope)
 {
     auto is_null_fn = std::make_shared<FunctionNode>("isNull");
-    is_null_fn->getArguments().getNodes().push_back(element_arg);
+    is_null_fn->getMutableArguments().push_back(element_arg);
 
     auto has_fn = std::make_shared<FunctionNode>("has");
-    has_fn->getArguments().getNodes().push_back(array_arg);
-    has_fn->getArguments().getNodes().push_back(element_arg);
+    auto & has_args = has_fn->getMutableArguments();
+    has_args.push_back(array_arg);
+    has_args.push_back(element_arg);
 
     auto null_const = std::make_shared<ConstantNode>(
         Field{},
         std::make_shared<DataTypeNullable>(std::make_shared<DataTypeUInt8>()));
 
     auto raw_if = std::make_shared<FunctionNode>("if");
-    raw_if->getArguments().getNodes() = {is_null_fn, null_const, has_fn};
+    raw_if->getMutableArguments() = {is_null_fn, null_const, has_fn};
 
     QueryTreeNodePtr if_node = raw_if;
     auto single_name = calculateFunctionProjectionName(if_node, {}, args_proj);
@@ -166,7 +167,7 @@ ProjectionNames QueryAnalyzer::buildHasExpression(
     }
 
     auto has_fn = std::make_shared<FunctionNode>("has");
-    has_fn->getArguments().getNodes() = {array_arg, element_arg};
+    has_fn->getMutableArguments() = {array_arg, element_arg};
     QueryTreeNodePtr result_node = has_fn;
     resolveFunction(result_node, scope);
 
@@ -194,7 +195,7 @@ ProjectionNames QueryAnalyzer::handleNullInTuple(
         if (isNullableOrLowCardinalityNullable(elem->getResultType()))
         {
             auto isnull_fn = std::make_shared<FunctionNode>("isNull");
-            isnull_fn->getArguments().getNodes().push_back(elem);
+            isnull_fn->getMutableArguments().push_back(elem);
             null_checks.emplace_back(isnull_fn);
         }
     }
@@ -211,11 +212,11 @@ ProjectionNames QueryAnalyzer::handleNullInTuple(
     array_fn->getArgumentsNode() = list_node;
 
     auto arraycount_fn = std::make_shared<FunctionNode>("arrayCount");
-    arraycount_fn->getArguments().getNodes().push_back(array_fn);
+    arraycount_fn->getMutableArguments().push_back(array_fn);
 
     auto zero_const = std::make_shared<ConstantNode>(Field(UInt64(0)), std::make_shared<DataTypeUInt64>());
     auto gt_fn = std::make_shared<FunctionNode>("greater");
-    gt_fn->getArguments().getNodes() = {arraycount_fn, zero_const};
+    gt_fn->getMutableArguments() = {arraycount_fn, zero_const};
 
     node = gt_fn;
     auto proj = calculateFunctionProjectionName(node, parameters_projection_names, arguments_projection_names);
@@ -389,7 +390,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
 
         if (safe_to_remove_asterisk && is_count_variant && is_not_count_distinct)
         {
-            auto & arguments = function_node_ptr->getArguments().getNodes();
+            auto & arguments = function_node_ptr->getMutableArguments();
 
             std::erase_if(arguments, [](const QueryTreeNodePtr & argument)
             {
@@ -412,7 +413,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
         !function_node_ptr->getArguments().getNodes().empty() &&
         function_node_ptr->getArguments().getNodes()[0]->getNodeType() == QueryTreeNodeType::IDENTIFIER)
     {
-        auto & first_argument = function_node_ptr->getArguments().getNodes()[0];
+        auto & first_argument = function_node_ptr->getMutableArguments()[0];
         auto & first_argument_identifier = first_argument->as<IdentifierNode &>();
         auto identifier = first_argument_identifier.getIdentifier();
 
@@ -467,7 +468,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
           *
           * SELECT if(hasColumnInTable('system', 'numbers', 'not_existing_column'), not_existing_column, 5) FROM system.numbers;
           */
-        auto & if_function_arguments = function_node_ptr->getArguments().getNodes();
+        auto & if_function_arguments = function_node_ptr->getMutableArguments();
         auto if_function_condition = if_function_arguments[0];
         resolveExpressionNode(if_function_condition, scope, false /*allow_lambda_expression*/, false /*allow_table_expression*/, allow_niladic_functions);
 
@@ -584,7 +585,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
                     auto projection = subquery_node->as<QueryNode>()->getProjection().clone();
 
                     QueryTreeNodePtr wrapper_tuple_node = std::make_shared<FunctionNode>("tuple");
-                    wrapper_tuple_node->as<FunctionNode>()->getArguments().getNodes() = std::move(projection->as<ListNode>()->getNodes());
+                    wrapper_tuple_node->as<FunctionNode>()->getMutableArguments() = std::move(projection->as<ListNode>()->getNodes());
                     resolveFunction(wrapper_tuple_node, scope);
 
                     /// Replace the original projection columns with one Tuple column
@@ -617,7 +618,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
 
                     auto subquery_projection = std::make_shared<IdentifierNode>(Identifier{unique_column_name});
 
-                    equals_function_node_ptr->getArguments().getNodes() = {
+                    equals_function_node_ptr->getMutableArguments() = {
                         std::move(copy_of_in_first_parameter), /// x
                         std::move(subquery_projection) /// `_unique_name_` from subquery
                     };
@@ -627,7 +628,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
                 }
 
                 auto exists_function_node_ptr = std::make_shared<FunctionNode>("exists");
-                exists_function_node_ptr->getArguments().getNodes() = {
+                exists_function_node_ptr->getMutableArguments() = {
                     std::move(new_exists_subquery)
                 };
 
@@ -635,7 +636,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
                 {
                     /// NOT IN is rewritten to NOT EXISTS
                     function_node_ptr = std::make_shared<FunctionNode>("not");
-                    function_node_ptr->getArguments().getNodes() = {
+                    function_node_ptr->getMutableArguments() = {
                         std::move(exists_function_node_ptr)
                     };
 
@@ -692,7 +693,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
 
         if (new_exists_subquery->isCorrelated())
         {
-            function_node_ptr->getArguments().getNodes() = {
+            function_node_ptr->getMutableArguments() = {
                 std::move(new_exists_argument)
             };
 
@@ -715,7 +716,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
                 QueryTreeNodePtr constant = std::make_shared<ConstantNode>(1UL, constant_data_type);
 
                 function_node_ptr = std::make_shared<FunctionNode>("in");
-                function_node_ptr->getArguments().getNodes() = {
+                function_node_ptr->getMutableArguments() = {
                     constant,
                     std::move(new_exists_argument)
                 };
@@ -793,7 +794,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
             }
         }
 
-        auto & function_in_arguments_nodes = function_node.getArguments().getNodes();
+        auto & function_in_arguments_nodes = function_node.getMutableArguments();
         if (function_in_arguments_nodes.size() != 2)
             throw Exception(ErrorCodes::NUMBER_OF_ARGUMENTS_DOESNT_MATCH, "Function '{}' expects 2 arguments", function_name);
 
@@ -873,7 +874,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
             if (in_second_argument->as<ColumnNode>())
             {
                 auto tuple_function = std::make_shared<FunctionNode>("tuple");
-                tuple_function->getArguments().getNodes().push_back(std::move(in_second_argument));
+                tuple_function->getMutableArguments().push_back(std::move(in_second_argument));
                 in_second_argument = std::move(tuple_function);
                 resolveFunction(in_second_argument, scope);
             }
@@ -885,7 +886,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
                 const bool is_not_in = (function_name == "notIn" || function_name == "globalNotIn" ||
                                         function_name == "notNullIn" || function_name == "globalNotNullIn");
                 const bool transform_null_in = scope.context->getSettingsRef()[Setting::transform_null_in];
-                auto & fn_args = function_node.getArguments().getNodes();
+                auto & fn_args = function_node.getMutableArguments();
 
                 /// the type of the second argument
                 bool is_array_type = (candidate_name == "array") ||
@@ -933,11 +934,11 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
                 {
                     auto proj = calculateFunctionProjectionName(node, parameters_projection_names, arguments_projection_names);
                     auto eq_fn = std::make_shared<FunctionNode>(is_not_in ? "notEquals" : "equals");
-                    eq_fn->getArguments().getNodes() = {fn_args[0], fn_args[1]};
+                    eq_fn->getMutableArguments() = {fn_args[0], fn_args[1]};
 
                     auto default_val = std::make_shared<ConstantNode>(is_not_in ? Field{1u} : Field{0u});
                     auto ifnull_fn = std::make_shared<FunctionNode>("ifNull");
-                    ifnull_fn->getArguments().getNodes() = {eq_fn, default_val};
+                    ifnull_fn->getMutableArguments() = {eq_fn, default_val};
 
                     node = ifnull_fn;
                     resolveFunction(node, scope);
@@ -965,7 +966,7 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
     bool all_arguments_are_deterministic = true;
     std::vector<size_t> function_lambda_arguments_indexes;
 
-    auto & function_arguments = function_node.getArguments().getNodes();
+    auto & function_arguments = function_node.getMutableArguments();
     size_t function_arguments_size = function_arguments.size();
 
     for (size_t function_argument_index = 0; function_argument_index < function_arguments_size; ++function_argument_index)
@@ -1132,8 +1133,9 @@ ProjectionNames QueryAnalyzer::resolveFunction(QueryTreeNodePtr & node, Identifi
             for (const auto & element_name : element_names)
             {
                 auto tuple_element_function = std::make_shared<FunctionNode>("tupleElement");
-                tuple_element_function->getArguments().getNodes().push_back(untuple_argument);
-                tuple_element_function->getArguments().getNodes().push_back(std::make_shared<ConstantNode>(element_name));
+                auto & tuple_elem_args = tuple_element_function->getMutableArguments();
+                tuple_elem_args.push_back(untuple_argument);
+                tuple_elem_args.push_back(std::make_shared<ConstantNode>(element_name));
 
                 QueryTreeNodePtr function_query_node = tuple_element_function;
                 resolveFunction(function_query_node, scope);

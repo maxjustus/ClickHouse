@@ -81,7 +81,7 @@ public:
                 new_arguments[1] = std::move(if_arguments_nodes[0]);
 
                 replaced_node = std::make_shared<FunctionNode>(function_node->getFunctionName() + "If");
-                replaced_node->getArguments().getNodes() = std::move(new_arguments);
+                replaced_node->getMutableArguments() = std::move(new_arguments);
                 replaced_node->getParameters().getNodes() = function_node->getParameters().getNodes();
                 resolveAggregateFunctionNodeByName(*replaced_node, replaced_node->getFunctionName());
             }
@@ -107,14 +107,14 @@ public:
 
                 auto not_function = std::make_shared<FunctionNode>("not");
                 not_function->markAsOperator();
-                auto & not_function_arguments = not_function->getArguments().getNodes();
+                auto & not_function_arguments = not_function->getMutableArguments();
                 not_function_arguments.push_back(std::move(if_arguments_nodes[0]));
                 not_function->resolveAsFunction(
                     FunctionFactory::instance().get("not", getContext())->build(not_function->getArgumentColumns()));
                 new_arguments[1] = std::move(not_function);
 
                 replaced_node = std::make_shared<FunctionNode>(function_node->getFunctionName() + "If");
-                replaced_node->getArguments().getNodes() = std::move(new_arguments);
+                replaced_node->getMutableArguments() = std::move(new_arguments);
                 replaced_node->getParameters().getNodes() = function_node->getParameters().getNodes();
                 resolveAggregateFunctionNodeByName(*replaced_node, replaced_node->getFunctionName());
             }

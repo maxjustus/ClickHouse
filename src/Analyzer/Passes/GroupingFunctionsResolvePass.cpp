@@ -85,7 +85,7 @@ public:
         if (!function_node || function_node->getFunctionName() != "grouping")
             return;
 
-        auto & function_arguments = function_node->getArguments().getNodes();
+        auto & function_arguments = function_node->getMutableArguments();
 
         ColumnNumbers arguments_indexes;
         arguments_indexes.reserve(function_arguments.size());

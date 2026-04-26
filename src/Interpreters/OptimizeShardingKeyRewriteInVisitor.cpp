@@ -155,7 +155,7 @@ public:
         if (!function_node || function_node->getFunctionName() != "in")
             return;
 
-        auto & arguments = function_node->getArguments().getNodes();
+        auto & arguments = function_node->getMutableArguments();
         auto * column = arguments[0]->as<ColumnNode>();
         if (!column)
             return;

@@ -169,13 +169,13 @@ private:
     {
         auto arithmetic_function_clone = arithmetic_function->clone();
         auto & arithmetic_function_clone_typed = arithmetic_function_clone->as<FunctionNode &>();
-        auto & arithmetic_function_clone_arguments_nodes = arithmetic_function_clone_typed.getArguments().getNodes();
+        auto & arithmetic_function_clone_arguments_nodes = arithmetic_function_clone_typed.getMutableArguments();
         auto & arithmetic_function_clone_argument = arithmetic_function_clone_arguments_nodes[arithmetic_function_argument_index];
 
         auto aggregate_function_clone = aggregate_function->clone();
         auto & aggregate_function_clone_typed = aggregate_function_clone->as<FunctionNode &>();
 
-        aggregate_function_clone_typed.getArguments().getNodes() = { arithmetic_function_clone_argument };
+        aggregate_function_clone_typed.getMutableArguments() = { arithmetic_function_clone_argument };
         resolveAggregateFunctionNodeByName(aggregate_function_clone_typed, result_aggregate_function_name);
 
         arithmetic_function_clone_arguments_nodes[arithmetic_function_argument_index] = std::move(aggregate_function_clone);

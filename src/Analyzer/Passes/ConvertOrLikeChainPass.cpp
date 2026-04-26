@@ -113,7 +113,7 @@ public:
 
                 /// The second argument will be added when all patterns are known.
                 auto match_function = std::make_shared<FunctionNode>("multiMatchAny");
-                match_function->getArguments().getNodes().push_back(like_first_argument);
+                match_function->getMutableArguments().push_back(like_first_argument);
                 match_functions.push_back(match_function);
 
                 unique_elems.push_back(std::move(match_function));
@@ -125,7 +125,7 @@ public:
         /// Add all the patterns into the function arguments lists.
         for (auto & match_function : match_functions)
         {
-            auto & arguments = match_function->getArguments().getNodes();
+            auto & arguments = match_function->getMutableArguments();
             auto & patterns = node_to_patterns.at(arguments[0]);
             arguments.push_back(std::make_shared<ConstantNode>(Field{std::move(patterns)}));
             match_function->resolveAsFunction(match_function_resolver);

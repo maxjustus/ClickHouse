@@ -80,11 +80,8 @@ public:
     /// Get parameters node
     QueryTreeNodePtr & getParametersNode() { return children[parameters_child_index]; }
 
-    /// Get arguments
+    /// Get arguments (read-only access)
     const ListNode & getArguments() const { return children[arguments_child_index]->as<const ListNode &>(); }
-
-    /// Get arguments
-    ListNode & getArguments() { return children[arguments_child_index]->as<ListNode &>(); }
 
     /// Get arguments node
     const QueryTreeNodePtr & getArgumentsNode() const { return children[arguments_child_index]; }

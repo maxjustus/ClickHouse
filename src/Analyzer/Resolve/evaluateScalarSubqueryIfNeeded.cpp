@@ -362,7 +362,7 @@ void QueryAnalyzer::evaluateScalarSubqueryIfNeeded(QueryTreeNodePtr & node, Iden
     auto scalar_query_hash_constant_node = std::make_shared<ConstantNode>(std::move(scalar_query_hash_string), std::make_shared<DataTypeString>());
 
     auto get_scalar_function_node = std::make_shared<FunctionNode>(get_scalar_function_name);
-    get_scalar_function_node->getArguments().getNodes().push_back(std::move(scalar_query_hash_constant_node));
+    get_scalar_function_node->getMutableArguments().push_back(std::move(scalar_query_hash_constant_node));
 
     auto get_scalar_function = FunctionFactory::instance().get(get_scalar_function_name, mutable_context);
     get_scalar_function_node->resolveAsFunction(get_scalar_function->build(get_scalar_function_node->getArgumentColumns()));

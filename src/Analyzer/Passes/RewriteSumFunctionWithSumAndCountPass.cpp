@@ -77,24 +77,24 @@ public:
             return;
 
         const auto lhs = std::make_shared<FunctionNode>("sum");
-        lhs->getArguments().getNodes().push_back(func_plus_minus_nodes[column_id]);
+        lhs->getMutableArguments().push_back(func_plus_minus_nodes[column_id]);
         resolveAggregateFunctionNodeByName(*lhs, lhs->getFunctionName());
 
         const auto rhs_count = std::make_shared<FunctionNode>("count");
-        rhs_count->getArguments().getNodes().push_back(func_plus_minus_nodes[column_id]);
+        rhs_count->getMutableArguments().push_back(func_plus_minus_nodes[column_id]);
         resolveAggregateFunctionNodeByName(*rhs_count, rhs_count->getFunctionName());
 
         const auto rhs = std::make_shared<FunctionNode>("multiply");
         rhs->markAsOperator();
-        rhs->getArguments().getNodes().push_back(func_plus_minus_nodes[literal_id]);
-        rhs->getArguments().getNodes().push_back(rhs_count);
+        rhs->getMutableArguments().push_back(func_plus_minus_nodes[literal_id]);
+        rhs->getMutableArguments().push_back(rhs_count);
         resolveOrdinaryFunctionNodeByName(*rhs, rhs->getFunctionName(), getContext());
 
         auto new_node = std::make_shared<FunctionNode>(Poco::toLower(func_plus_minus_node->getFunctionName()));
         if (column_id == 0)
-            new_node->getArguments().getNodes() = {lhs, rhs};
+            new_node->getMutableArguments() = {lhs, rhs};
         else if (column_id == 1)
-            new_node->getArguments().getNodes() = {rhs, lhs};
+            new_node->getMutableArguments() = {rhs, lhs};
 
         resolveOrdinaryFunctionNodeByName(*new_node, new_node->getFunctionName(), getContext());
 
