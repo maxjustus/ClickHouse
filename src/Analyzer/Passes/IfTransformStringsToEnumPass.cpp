@@ -55,7 +55,7 @@ void changeIfArguments(
 {
     auto result_type = getEnumType(string_values);
 
-    auto & argument_nodes = if_node.getArguments().getNodes();
+    auto & argument_nodes = if_node.getMutableArguments();
 
     argument_nodes[1] = createCastFunction(argument_nodes[1], result_type, context);
     argument_nodes[2] = createCastFunction(argument_nodes[2], result_type, context);
@@ -74,7 +74,7 @@ void changeTransformArguments(
 {
     auto result_type = getEnumType(string_values);
 
-    auto & arguments = transform_node.getArguments().getNodes();
+    auto & arguments = transform_node.getMutableArguments();
 
     auto & array_to = arguments[2];
     auto & default_value = arguments[3];
@@ -90,15 +90,7 @@ void changeTransformArguments(
 void wrapIntoToString(FunctionNode & function_node, QueryTreeNodePtr arg, ContextPtr context)
 {
     auto to_string_function = FunctionFactory::instance().get("toString", std::move(context));
-    QueryTreeNodes arguments{ std::move(arg) };
-    /// Replace the arguments ListNode wholesale rather than mutating its inner vector,
-    /// because the existing ListNode shared_ptr can be aliased between distinct
-    /// FunctionNode wrappers via cache-hit shallow-clone (which copies the children
-    /// vector but shares each element's shared_ptr). Mutating the shared ListNode would
-    /// shrink the args of unrelated `if` references that the planner later trips over
-    /// with 'Number of arguments for function if doesn't match: passed 1, should be 3'.
-    function_node.getArgumentsNode() = std::make_shared<ListNode>(std::move(arguments));
-
+    function_node.getMutableArguments() = {std::move(arg)};
     function_node.resolveAsFunction(to_string_function->build(function_node.getArgumentColumns()));
 
     assert(isString(removeNullable(function_node.getResultType())));

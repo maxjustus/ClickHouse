@@ -1087,7 +1087,7 @@ private:
         }
 
         auto and_function_resolver = FunctionFactory::instance().get("and", getContext());
-        function_node.getArguments().getNodes() = std::move(and_operands);
+        function_node.getMutableArguments() = std::move(and_operands);
         function_node.resolveAsFunction(and_function_resolver);
     }
 
@@ -1240,7 +1240,7 @@ private:
                         and_node->getArguments().getNodes().push_back(constant->clone());
                         and_node->resolveAsFunction(
                             FunctionFactory::instance().get(compare_function_name, getContext()));
-                        function_node.getArguments().getNodes().push_back(and_node);
+                        function_node.getMutableArguments().push_back(and_node);
                     }
 
                     findPairs(pairs, left.first, constant ? constant : current->as<ConstantNode>(), compare_type);
@@ -1407,7 +1407,7 @@ private:
         }
 
         auto or_function_resolver = FunctionFactory::instance().get("or", getContext());
-        function_node.getArguments().getNodes() = std::move(or_operands);
+        function_node.getMutableArguments() = std::move(or_operands);
         function_node.resolveAsFunction(or_function_resolver);
     }
 

@@ -135,7 +135,7 @@ public:
         if (unique_elems.size() == 1)
             unique_elems.push_back(std::make_shared<ConstantNode>(static_cast<UInt8>(0)));
 
-        function_node->getArguments().getNodes() = std::move(unique_elems);
+        function_node->getMutableArguments() = std::move(unique_elems);
         function_node->resolveAsFunction(or_function_resolver);
     }
 private:

@@ -90,7 +90,7 @@ public:
                     current = createFunctionNode(function_resolver, std::move(current), arguments[i]);
 
                 auto & new_function_node = current->as<FunctionNode &>();
-                function_node->getArguments().getNodes() = std::move(new_function_node.getArguments().getNodes());
+                function_node->getMutableArguments() = std::move(new_function_node.getArguments().getNodes());
                 function_node->resolveAsFunction(function_resolver);
             }
         }

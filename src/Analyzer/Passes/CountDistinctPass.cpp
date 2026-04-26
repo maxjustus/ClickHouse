@@ -85,7 +85,7 @@ public:
         /// Replace `countDistinct` of initial query into `count`
         auto result_type = function_node->getResultType();
 
-        function_node->getArguments().getNodes().clear();
+        function_node->getMutableArguments().clear();
         resolveAggregateFunctionNodeByName(*function_node, "count");
     }
 };

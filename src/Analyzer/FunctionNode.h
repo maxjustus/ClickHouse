@@ -92,6 +92,18 @@ public:
     /// Get arguments node
     QueryTreeNodePtr & getArgumentsNode() { return children[arguments_child_index]; }
 
+    /** Returns mutable reference to arguments vector.
+      * If the arguments ListNode is shared (use_count > 1), clones it first
+      * to avoid mutating shared state from shallow-cloned cache hits.
+      */
+    QueryTreeNodes & getMutableArguments()
+    {
+        auto & args_node = children[arguments_child_index];
+        if (args_node.use_count() > 1)
+            args_node = args_node->clone();
+        return args_node->as<ListNode &>().getNodes();
+    }
+
     /// Get argument types
     const DataTypes & getArgumentTypes() const;
 

@@ -138,7 +138,7 @@ public:
         auto original_result_type = function_node->getResultType();
 
         /// Re-resolve function with new arguments
-        function_node->getArguments().getNodes() = std::move(new_args);
+        function_node->getMutableArguments() = std::move(new_args);
         auto function_builder = FunctionFactory::instance().get(function_name, getContext());
         function_node->resolveAsFunction(function_builder->build(function_node->getArgumentColumns()));
 

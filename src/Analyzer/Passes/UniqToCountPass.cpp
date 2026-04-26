@@ -191,7 +191,7 @@ public:
         /// Replace uniq of initial query to count
         if (match_subquery_with_distinct() || match_subquery_with_group_by())
         {
-            function_node->getArguments().getNodes().clear();
+            function_node->getMutableArguments().clear();
             resolveAggregateFunctionNodeByName(*function_node, "count");
         }
     }

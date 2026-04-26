@@ -53,14 +53,14 @@ public:
 
         if (function_node->getFunctionName() == "count" && !first_argument_constant_literal.isNull())
         {
-            function_node->getArguments().getNodes().clear();
+            function_node->getMutableArguments().clear();
             resolveAggregateFunctionNodeByName(*function_node, "count");
         }
         else if (function_node->getFunctionName() == "sum" &&
             first_argument_constant_literal.getType() == Field::Types::UInt64 &&
             first_argument_constant_literal.safeGet<UInt64>() == 1)
         {
-            function_node->getArguments().getNodes().clear();
+            function_node->getMutableArguments().clear();
             resolveAggregateFunctionNodeByName(*function_node, "count");
         }
     }

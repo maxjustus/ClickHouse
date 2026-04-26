@@ -98,7 +98,7 @@ public:
         if (!replaced_aggregate_function->getResultType()->equals(*current_aggregate_function->getResultType()))
             return;
 
-        function_node->getArguments().getNodes() = std::move(replaced_uniq_function_arguments_nodes);
+        function_node->getMutableArguments() = std::move(replaced_uniq_function_arguments_nodes);
         function_node->resolveAsAggregateFunction(std::move(replaced_aggregate_function));
     }
 };
