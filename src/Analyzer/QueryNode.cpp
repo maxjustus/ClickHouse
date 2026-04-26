@@ -78,7 +78,7 @@ void QueryNode::resolveProjectionColumns(NamesAndTypes projection_columns_value)
 
 void QueryNode::removeUnusedProjectionColumns(const std::unordered_set<size_t> & used_projection_columns_indexes)
 {
-    auto & projection_nodes = getProjection().getNodes();
+    auto & projection_nodes = getProjection().getMutableNodes();
     size_t projection_columns_size = projection_columns.size();
     size_t write_index = 0;
 
@@ -102,7 +102,7 @@ void QueryNode::removeUnusedProjectionColumns(const std::unordered_set<size_t> &
             used_projection_columns.insert(projection.name);
 
         auto & interpolate_node = getInterpolate();
-        auto & interpolate_list_nodes = interpolate_node->as<ListNode &>().getNodes();
+        auto & interpolate_list_nodes = interpolate_node->as<ListNode &>().getMutableNodes();
         std::erase_if(
             interpolate_list_nodes,
             [&used_projection_columns](const QueryTreeNodePtr & interpolate)
@@ -129,7 +129,7 @@ ColumnNodePtrWithHashSet QueryNode::getCorrelatedColumnsSet() const
 
 void QueryNode::addCorrelatedColumn(const QueryTreeNodePtr & correlated_column)
 {
-    auto & correlated_columns = getCorrelatedColumns().getNodes();
+    auto & correlated_columns = getCorrelatedColumns().getMutableNodes();
     for (const auto & column : correlated_columns)
     {
         if (column->isEqual(*correlated_column))

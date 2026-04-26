@@ -261,10 +261,23 @@ public:
         return children;
     }
 
-    /// Get query tree node children
+    /// Get query tree node children (const)
     const QueryTreeNodes & getChildren() const
     {
         return children;
+    }
+
+    /** Get a mutable reference to a child, cloning it if shared.
+      * This is the COW (copy-on-write) entry point: if the child is
+      * referenced by more than one parent (use_count > 1), we clone
+      * it so mutations don't affect other owners.
+      */
+    QueryTreeNodePtr & getMutableChild(size_t index)
+    {
+        auto & child = children[index];
+        if (child && child.use_count() > 1)
+            child = child->clone();
+        return child;
     }
 
 protected:

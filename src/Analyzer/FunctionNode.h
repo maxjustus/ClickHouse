@@ -98,7 +98,18 @@ public:
         auto & args_node = children[arguments_child_index];
         if (args_node.use_count() > 1)
             args_node = args_node->clone();
-        return args_node->as<ListNode &>().getNodes();
+        return args_node->as<ListNode &>().getMutableNodes();
+    }
+
+    /** Returns mutable reference to parameters vector.
+      * If the parameters ListNode is shared (use_count > 1), clones it first.
+      */
+    QueryTreeNodes & getMutableParameters()
+    {
+        auto & params_node = children[parameters_child_index];
+        if (params_node.use_count() > 1)
+            params_node = params_node->clone();
+        return params_node->as<ListNode &>().getMutableNodes();
     }
 
     /// Get argument types

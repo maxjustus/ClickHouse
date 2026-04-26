@@ -184,7 +184,7 @@ void resolveGroupingFunctions(QueryTreeNodePtr & query_node, ContextPtr context)
         {
             auto grouping_set_list_node = query_node_typed.getGroupBy().getNodes().front();
             auto & grouping_set_list_node_typed = grouping_set_list_node->as<ListNode &>();
-            query_node_typed.getGroupBy().getNodes() = std::move(grouping_set_list_node_typed.getNodes());
+            query_node_typed.getMutableGroupBy() = std::move(grouping_set_list_node_typed.getMutableNodes());
             query_node_typed.setIsGroupByWithGroupingSets(false);
         }
 

@@ -171,7 +171,7 @@ void UnionNode::removeUnusedProjectionColumns(const std::unordered_set<size_t> &
 
 void UnionNode::addCorrelatedColumn(const QueryTreeNodePtr & correlated_column)
 {
-    auto & correlated_columns = getCorrelatedColumns().getNodes();
+    auto & correlated_columns = getCorrelatedColumns().getMutableNodes();
     for (const auto & column : correlated_columns)
     {
         if (column->isEqual(*correlated_column))

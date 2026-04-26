@@ -44,7 +44,7 @@ public:
             }
         }
 
-        query_node->getOrderBy().getNodes() = std::move(result_nodes);
+        query_node->getMutableOrderBy() = std::move(result_nodes);
     }
 };
 

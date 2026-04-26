@@ -26,13 +26,23 @@ public:
     explicit ListNode(QueryTreeNodes nodes);
 
     /// Get list nodes
+    QueryTreeNodes & getNodes()
+    {
+        return children;
+    }
+
+    /// Get list nodes (const)
     const QueryTreeNodes & getNodes() const
     {
         return children;
     }
 
-    /// Get list nodes
-    QueryTreeNodes & getNodes()
+    /** Get mutable list nodes with COW protection.
+      * Use this when modifying the nodes vector on a potentially shared ListNode.
+      * The caller must ensure the ListNode itself is cloned if shared
+      * (typically via the parent's getMutableChild or getMutable* accessor).
+      */
+    QueryTreeNodes & getMutableNodes()
     {
         return children;
     }

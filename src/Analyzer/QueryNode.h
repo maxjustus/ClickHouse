@@ -302,6 +302,15 @@ public:
         return children[with_child_index];
     }
 
+    /// Get mutable WITH section (clones if shared)
+    QueryTreeNodes & getMutableWith()
+    {
+        auto & node = children[with_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
+    }
+
     /// Get PROJECTION section
     const ListNode & getProjection() const
     {
@@ -324,6 +333,15 @@ public:
     QueryTreeNodePtr & getProjectionNode()
     {
         return children[projection_child_index];
+    }
+
+    /// Get mutable PROJECTION section (clones if shared)
+    QueryTreeNodes & getMutableProjection()
+    {
+        auto & node = children[projection_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
     }
 
     /// Get JOIN TREE section node
@@ -404,6 +422,15 @@ public:
         return children[group_by_child_index];
     }
 
+    /// Get mutable GROUP BY section (clones if shared)
+    QueryTreeNodes & getMutableGroupBy()
+    {
+        auto & node = children[group_by_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
+    }
+
     /// Returns true if query node HAVING section is not empty, false otherwise
     bool hasHaving() const
     {
@@ -452,6 +479,15 @@ public:
         return children[window_child_index];
     }
 
+    /// Get mutable WINDOW section (clones if shared)
+    QueryTreeNodes & getMutableWindow()
+    {
+        auto & node = children[window_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
+    }
+
     /// Returns true if query node QUALIFY section is not empty, false otherwise
     bool hasQualify() const
     {
@@ -498,6 +534,15 @@ public:
     QueryTreeNodePtr & getOrderByNode()
     {
         return children[order_by_child_index];
+    }
+
+    /// Get mutable ORDER BY section (clones if shared)
+    QueryTreeNodes & getMutableOrderBy()
+    {
+        auto & node = children[order_by_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
     }
 
     /// Returns true if query node INTERPOLATE section is not empty, false otherwise
@@ -582,6 +627,15 @@ public:
     QueryTreeNodePtr & getLimitByNode()
     {
         return children[limit_by_child_index];
+    }
+
+    /// Get mutable LIMIT BY section (clones if shared)
+    QueryTreeNodes & getMutableLimitBy()
+    {
+        auto & node = children[limit_by_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
     }
 
     /// Returns true if query node LIMIT section is not empty, false otherwise

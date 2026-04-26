@@ -25,7 +25,7 @@ public:
             QueryTreeNodeConstRawPtrWithHashSet unique_expressions_nodes_set;
             QueryTreeNodes result_nodes;
 
-            auto & query_order_by_nodes = query_node->getOrderBy().getNodes();
+            auto & query_order_by_nodes = query_node->getMutableOrderBy();
 
             for (auto & sort_node : query_order_by_nodes)
             {
@@ -51,7 +51,7 @@ public:
             QueryTreeNodeConstRawPtrWithHashSet unique_expressions_nodes_set;
             QueryTreeNodes result_nodes;
 
-            auto & query_limit_by_nodes = query_node->getLimitBy().getNodes();
+            auto & query_limit_by_nodes = query_node->getMutableLimitBy();
 
             for (auto & limit_by_node : query_limit_by_nodes)
             {

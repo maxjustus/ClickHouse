@@ -82,7 +82,7 @@ public:
 
                 replaced_node = std::make_shared<FunctionNode>(function_node->getFunctionName() + "If");
                 replaced_node->getMutableArguments() = std::move(new_arguments);
-                replaced_node->getParameters().getNodes() = function_node->getParameters().getNodes();
+                replaced_node->getMutableParameters() = function_node->getParameters().getNodes();
                 resolveAggregateFunctionNodeByName(*replaced_node, replaced_node->getFunctionName());
             }
         }
@@ -115,7 +115,7 @@ public:
 
                 replaced_node = std::make_shared<FunctionNode>(function_node->getFunctionName() + "If");
                 replaced_node->getMutableArguments() = std::move(new_arguments);
-                replaced_node->getParameters().getNodes() = function_node->getParameters().getNodes();
+                replaced_node->getMutableParameters() = function_node->getParameters().getNodes();
                 resolveAggregateFunctionNodeByName(*replaced_node, replaced_node->getFunctionName());
             }
         }

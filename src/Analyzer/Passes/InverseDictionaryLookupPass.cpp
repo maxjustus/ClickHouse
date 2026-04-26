@@ -234,7 +234,7 @@ public:
         DataTypePtr dict_attr_col_type = dict_structure.getAttribute(attr_col_name).type;
 
         auto dict_table_function = std::make_shared<TableFunctionNode>("dictionary");
-        dict_table_function->getArguments().getNodes().push_back(dictget_function_info.dict_name_node);
+        dict_table_function->getMutableArguments().push_back(dictget_function_info.dict_name_node);
         resolveNode(dict_table_function, getContext());
 
         NameAndTypePair attr_col{attr_col_name, dict_attr_col_type};
@@ -268,7 +268,7 @@ public:
 
         for (const auto & key_col_node : key_cols)
         {
-            subquery_node->getProjection().getNodes().push_back(std::make_shared<ColumnNode>(key_col_node, dict_table_function));
+            subquery_node->getMutableProjection().push_back(std::make_shared<ColumnNode>(key_col_node, dict_table_function));
         }
         subquery_node->resolveProjectionColumns(key_cols);
 

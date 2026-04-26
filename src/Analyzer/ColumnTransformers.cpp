@@ -251,7 +251,7 @@ ReplaceColumnTransformerNode::ReplaceColumnTransformerNode(const std::vector<Rep
 {
     children[replacements_child_index] = std::make_shared<ListNode>();
 
-    auto & replacement_expressions_nodes = getReplacements().getNodes();
+    auto & replacement_expressions_nodes = getReplacements().getMutableNodes();
 
     std::unordered_set<std::string> replacement_names_set;
 

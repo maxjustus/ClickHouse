@@ -81,7 +81,7 @@ public:
         existing_keys.clear();
 
         if (new_order_by_nodes.size() < order_by.getNodes().size())
-            order_by.getNodes() = std::move(new_order_by_nodes);
+            order_by.getMutableNodes() = std::move(new_order_by_nodes);
     }
 
 private:

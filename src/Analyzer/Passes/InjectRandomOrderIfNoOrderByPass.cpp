@@ -31,7 +31,7 @@ void addRandomOrderBy(ListNode & order_by_list_node, ContextPtr context)
 
     /// Create and add ORDER BY rand() node
     auto sort_node = std::make_shared<SortNode>(rand_function_node);
-    order_by_list_node.getNodes().push_back(std::move(sort_node));
+    order_by_list_node.getMutableNodes().push_back(std::move(sort_node));
 }
 
 /// Wrap query_root in new QueryNode that includes a random order by
@@ -51,7 +51,7 @@ void wrapWithSelectOrderBy(QueryTreeNodePtr & query_root, ContextPtr context)
     auto new_root = std::make_shared<QueryNode>(Context::createCopy(context));
     new_root->getJoinTree() = query_root;
     NameAndTypePair column{unique_column_name, subquery_projection_columns[0].type};
-    new_root->getProjection().getNodes().push_back(std::make_shared<ColumnNode>(column, query_root));
+    new_root->getMutableProjection().push_back(std::make_shared<ColumnNode>(column, query_root));
     new_root->resolveProjectionColumns({column});
     addRandomOrderBy(new_root->getOrderBy(), context);
 
@@ -79,8 +79,7 @@ void InjectRandomOrderIfNoOrderByPass::run(QueryTreeNodePtr & root, ContextPtr c
     /// Case 2: Top-level UNION - wrap each branch
     if (auto * union_node = root->as<UnionNode>())
     {
-        auto & union_subqueries = union_node->getQueries();
-        for (auto & union_subquery_node : union_subqueries.getNodes())
+        for (auto & union_subquery_node : union_node->getMutableQueries())
         {
             if (auto * node = union_subquery_node->as<QueryNode>())
                 if (!node->hasOrderBy())

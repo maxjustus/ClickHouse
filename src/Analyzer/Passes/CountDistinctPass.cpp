@@ -75,8 +75,8 @@ public:
         /// Build subquery SELECT count_distinct_argument_column FROM table_expression GROUP BY count_distinct_argument_column
         auto subquery = std::make_shared<QueryNode>(Context::createCopy(query_node->getContext()));
         subquery->getJoinTree() = query_node->getJoinTree();
-        subquery->getProjection().getNodes().push_back(count_distinct_argument_column);
-        subquery->getGroupBy().getNodes().push_back(count_distinct_argument_column);
+        subquery->getMutableProjection().push_back(count_distinct_argument_column);
+        subquery->getMutableGroupBy().push_back(count_distinct_argument_column);
         subquery->resolveProjectionColumns({count_distinct_argument_column_typed.getColumn()});
 
         /// Put subquery into JOIN TREE of initial query

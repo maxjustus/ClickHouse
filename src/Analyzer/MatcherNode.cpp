@@ -110,7 +110,7 @@ MatcherNode::MatcherNode(MatcherNodeType matcher_type_,
 
     auto column_transformers_list_node = std::make_shared<ListNode>();
 
-    auto & column_transformers_nodes = column_transformers_list_node->getNodes();
+    auto & column_transformers_nodes = column_transformers_list_node->getMutableNodes();
     column_transformers_nodes.reserve(column_transformers_.size());
 
     for (auto && column_transformer : column_transformers_)

@@ -49,12 +49,12 @@ public:
         if (query->isGroupByWithCube() || query->isGroupByWithRollup())
             return;
 
-        auto & group_by = query->getGroupBy().getNodes();
+        auto & group_by = query->getMutableGroupBy();
         if (query->isGroupByWithGroupingSets())
         {
             for (auto & set : group_by)
             {
-                auto & grouping_set = set->as<ListNode>()->getNodes();
+                auto & grouping_set = set->as<ListNode &>().getMutableNodes();
                 optimizeGroupingSet(grouping_set);
             }
         }

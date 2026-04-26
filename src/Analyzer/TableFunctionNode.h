@@ -73,6 +73,15 @@ public:
         return children[arguments_child_index];
     }
 
+    /// Get mutable arguments (clones if shared)
+    QueryTreeNodes & getMutableArguments()
+    {
+        auto & args_node = children[arguments_child_index];
+        if (args_node.use_count() > 1)
+            args_node = args_node->clone();
+        return args_node->as<ListNode &>().getMutableNodes();
+    }
+
     /// Returns true, if table function is resolved, false otherwise
     bool isResolved() const
     {

@@ -20,7 +20,7 @@ LambdaNode::LambdaNode(Names argument_names_, QueryTreeNodePtr expression_, bool
     , is_operator(is_operator_)
 {
     auto arguments_list_node = std::make_shared<ListNode>();
-    auto & nodes = arguments_list_node->getNodes();
+    auto & nodes = arguments_list_node->getMutableNodes();
 
     size_t argument_names_size = argument_names.size();
     nodes.reserve(argument_names_size);

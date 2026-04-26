@@ -175,6 +175,15 @@ public:
         return children[queries_child_index];
     }
 
+    /// Get mutable queries (clones if shared)
+    QueryTreeNodes & getMutableQueries()
+    {
+        auto & node = children[queries_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
+    }
+
     /// Returns true if union node is resolved, false otherwise
     bool isResolved() const;
 

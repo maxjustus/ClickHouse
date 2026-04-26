@@ -207,7 +207,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildSelectWithUnionExpression(
     {
         auto & select_list_node = select_lists.children[i];
         QueryTreeNodePtr query_node = buildSelectOrUnionExpression(select_list_node, false /*is_subquery*/, {} /*cte_name*/, aliases, context);
-        union_node->getQueries().getNodes().push_back(std::move(query_node));
+        union_node->getMutableQueries().push_back(std::move(query_node));
     }
 
     return union_node;
@@ -250,7 +250,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildSelectIntersectExceptQuery(
     {
         auto & select_list_node = select_lists[i];
         QueryTreeNodePtr query_node = buildSelectOrUnionExpression(select_list_node, false /*is_subquery*/, {} /*cte_name*/, nullptr /*aliases*/, context);
-        union_node->getQueries().getNodes().push_back(std::move(query_node));
+        union_node->getMutableQueries().push_back(std::move(query_node));
     }
 
     return union_node;
@@ -401,7 +401,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildSelectExpression(
             for (auto & grouping_sets_keys : group_by_children)
             {
                 auto grouping_sets_keys_list_node = buildExpressionList(grouping_sets_keys, current_context);
-                current_query_tree->getGroupBy().getNodes().emplace_back(std::move(grouping_sets_keys_list_node));
+                current_query_tree->getMutableGroupBy().emplace_back(std::move(grouping_sets_keys_list_node));
             }
         }
         else
@@ -440,7 +440,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildSelectExpression(
             auto sort_node = std::make_shared<SortNode>(std::move(placeholder_expr), sort_direction, nulls_sort_direction);
 
             auto list_node = std::make_shared<ListNode>();
-            list_node->getNodes().push_back(std::move(sort_node));
+            list_node->getMutableNodes().push_back(std::move(sort_node));
             current_query_tree->getOrderByNode() = std::move(list_node);
         }
         else if (select_query_typed.order_by_all)
@@ -568,7 +568,8 @@ QueryTreeNodePtr QueryTreeBuilder::buildSortList(const ASTPtr & order_by_express
     auto list_node = std::make_shared<ListNode>();
 
     auto & expression_list_typed = order_by_expression_list->as<ASTExpressionList &>();
-    list_node->getNodes().reserve(expression_list_typed.children.size());
+    auto & nodes = list_node->getMutableNodes();
+    nodes.reserve(expression_list_typed.children.size());
 
     for (auto & expression : expression_list_typed.children)
     {
@@ -600,7 +601,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildSortList(const ASTPtr & order_by_express
         if (order_by_element.getFillStaleness())
             sort_node->getFillStaleness() = buildExpression(order_by_element.getFillStaleness(), context);
 
-        list_node->getNodes().push_back(std::move(sort_node));
+        nodes.push_back(std::move(sort_node));
     }
 
     return list_node;
@@ -611,7 +612,8 @@ QueryTreeNodePtr QueryTreeBuilder::buildInterpolateList(const ASTPtr & interpola
     auto list_node = std::make_shared<ListNode>();
 
     auto & expression_list_typed = interpolate_expression_list->as<ASTExpressionList &>();
-    list_node->getNodes().reserve(expression_list_typed.children.size());
+    auto & nodes = list_node->getMutableNodes();
+    nodes.reserve(expression_list_typed.children.size());
 
     for (auto & expression : expression_list_typed.children)
     {
@@ -620,7 +622,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildInterpolateList(const ASTPtr & interpola
         auto interpolate_expression = buildExpression(interpolate_element.expr, context);
         auto interpolate_node = std::make_shared<InterpolateNode>(std::move(expression_to_interpolate), std::move(interpolate_expression));
 
-        list_node->getNodes().push_back(std::move(interpolate_node));
+        nodes.push_back(std::move(interpolate_node));
     }
 
     return list_node;
@@ -631,7 +633,8 @@ QueryTreeNodePtr QueryTreeBuilder::buildWindowList(const ASTPtr & window_definit
     auto list_node = std::make_shared<ListNode>();
 
     auto & expression_list_typed = window_definition_list->as<ASTExpressionList &>();
-    list_node->getNodes().reserve(expression_list_typed.children.size());
+    auto & nodes = list_node->getMutableNodes();
+    nodes.reserve(expression_list_typed.children.size());
 
     for (auto & window_list_element : expression_list_typed.children)
     {
@@ -640,7 +643,7 @@ QueryTreeNodePtr QueryTreeBuilder::buildWindowList(const ASTPtr & window_definit
         auto window_node = buildWindow(window_list_element_typed.definition, context);
         window_node->setAlias(window_list_element_typed.name);
 
-        list_node->getNodes().push_back(std::move(window_node));
+        nodes.push_back(std::move(window_node));
     }
 
     return list_node;
@@ -651,12 +654,13 @@ QueryTreeNodePtr QueryTreeBuilder::buildExpressionList(const ASTPtr & expression
     auto list_node = std::make_shared<ListNode>();
 
     auto & expression_list_typed = expression_list->as<ASTExpressionList &>();
-    list_node->getNodes().reserve(expression_list_typed.children.size());
+    auto & nodes = list_node->getMutableNodes();
+    nodes.reserve(expression_list_typed.children.size());
 
     for (auto & expression : expression_list_typed.children)
     {
         auto expression_node = buildExpression(expression, context);
-        list_node->getNodes().push_back(std::move(expression_node));
+        nodes.push_back(std::move(expression_node));
     }
 
     return list_node;
@@ -759,8 +763,9 @@ QueryTreeNodePtr QueryTreeBuilder::buildExpression(const ASTPtr & expression, co
                 if (function->parameters)
                 {
                     const auto & function_parameters_list = function->parameters->as<ASTExpressionList>()->children;
+                    auto & fn_params = function_node->getMutableParameters();
                     for (const auto & argument : function_parameters_list)
-                        function_node->getParameters().getNodes().push_back(buildExpression(argument, context));
+                        fn_params.push_back(buildExpression(argument, context));
                 }
 
                 if (function->arguments)
@@ -917,11 +922,11 @@ std::shared_ptr<TableFunctionNode> QueryTreeBuilder::buildTableFunction(const AS
                     table_function_expression.formatForErrorMessage());
 
             if (argument->as<ASTSelectQuery>() || argument->as<ASTSelectWithUnionQuery>() || argument->as<ASTSelectIntersectExceptQuery>())
-                node->getArguments().getNodes().push_back(buildSelectOrUnionExpression(argument, false /*is_subquery*/, {} /*cte_name*/, nullptr /*aliases*/, context));
+                node->getMutableArguments().push_back(buildSelectOrUnionExpression(argument, false /*is_subquery*/, {} /*cte_name*/, nullptr /*aliases*/, context));
             else if (const auto * ast_set = argument->as<ASTSetQuery>())
                 node->setSettingsChanges(ast_set->changes);
             else
-                node->getArguments().getNodes().push_back(buildExpression(argument, context));
+                node->getMutableArguments().push_back(buildExpression(argument, context));
         }
     }
 
@@ -1310,7 +1315,7 @@ QueryTreeNodePtr QueryTreeBuilder::setSecondArgumentAsParameter(const ASTFunctio
     auto function_node = std::make_shared<FunctionNode>(function->name);
     function_node->setNullsAction(function->getNullsAction());
 
-    function_node->getParameters().getNodes().push_back(buildExpression(function->arguments->children[1], context)); // Separator
+    function_node->getMutableParameters().push_back(buildExpression(function->arguments->children[1], context)); // Separator
     function_node->getMutableArguments().push_back(buildExpression(first_arg, context)); // Column to concatenate
 
     if (function->isWindowFunction())

@@ -168,7 +168,7 @@ FunctionNodePtr createResolvedAggregateFunction(
         QueryTreeNodes parameter_nodes;
         for (const auto & param : parameters)
             parameter_nodes.emplace_back(std::make_shared<ConstantNode>(param));
-        function_node->getParameters().getNodes() = std::move(parameter_nodes);
+        function_node->getMutableParameters() = std::move(parameter_nodes);
     }
     function_node->getMutableArguments() = { argument };
 
