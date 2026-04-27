@@ -23,7 +23,7 @@ public:
 
         QueryTreeNodes result_nodes;
 
-        for (auto & sort_node : query_node->getOrderBy().getNodes())
+        for (auto & sort_node : query_node->getMutableOrderBy())
         {
             auto & sort_node_typed = sort_node->as<SortNode &>();
             auto * function_expression = sort_node_typed.getExpression()->as<FunctionNode>();
@@ -33,7 +33,7 @@ public:
                 continue;
             }
 
-            auto & tuple_arguments_nodes = function_expression->getArguments().getNodes();
+            auto & tuple_arguments_nodes = function_expression->getMutableArguments();
             for (auto & argument_node : tuple_arguments_nodes)
             {
                 auto result_sort_node = std::make_shared<SortNode>(argument_node,

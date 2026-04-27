@@ -77,7 +77,7 @@ public:
                {"max", {"multiply", "divide", "plus", "minus"}},
                {"avg", {"multiply", "divide", "plus", "minus"}}};
 
-        auto & aggregate_function_arguments_nodes = aggregate_function_node->getArguments().getNodes();
+        auto & aggregate_function_arguments_nodes = aggregate_function_node->getMutableArguments();
         if (aggregate_function_arguments_nodes.size() != 1)
             return;
 

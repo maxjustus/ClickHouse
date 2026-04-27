@@ -212,7 +212,7 @@ std::shared_ptr<FunctionNode> getFlattenedLogicalExpression(const FunctionNode &
         auto maybe_flattened = getFlattenedLogicalExpression(*maybe_function, context);
         if (maybe_flattened)
         {
-            auto & flattened_arguments = maybe_flattened->getArguments().getNodes();
+            auto & flattened_arguments = maybe_flattened->getMutableArguments();
             std::move(flattened_arguments.begin(), flattened_arguments.end(), std::back_inserter(new_arguments));
         }
         else
@@ -378,7 +378,7 @@ std::optional<CommonExpressionExtractionResult> tryExtractCommonExpressions(cons
 
         if (first_argument)
         {
-            auto & current_arguments = and_node->getArguments().getNodes();
+            auto & current_arguments = and_node->getMutableArguments();
             common_exprs.reserve(current_arguments.size());
 
             for (auto & and_argument : current_arguments)

@@ -154,7 +154,7 @@ public:
         if (!allowed_comparison_functions.contains(attr_comparison_function_name))
             return;
 
-        auto & arguments = node_function->getArguments().getNodes();
+        auto & arguments = node_function->getMutableArguments();
         if (arguments.size() != 2)
             return;
 

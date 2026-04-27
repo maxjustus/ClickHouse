@@ -79,7 +79,7 @@ private:
             return false;
 
         std::vector<NodeWithInfo> candidates;
-        auto & function_arguments = function->getArguments().getNodes();
+        auto & function_arguments = function->getMutableArguments();
         bool is_deterministic = function->getFunctionOrThrow()->isDeterministicInScopeOfQuery();
         for (auto it = function_arguments.rbegin(); it != function_arguments.rend(); ++it)
             candidates.push_back({ *it, is_deterministic });
@@ -99,7 +99,7 @@ private:
                 case QueryTreeNodeType::FUNCTION:
                 {
                     auto * func = candidate->as<FunctionNode>();
-                    auto & arguments = func->getArguments().getNodes();
+                    auto & arguments = func->getMutableArguments();
                     if (arguments.empty())
                         return false;
 

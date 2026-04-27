@@ -50,7 +50,7 @@ public:
         if (!is_distance_function)
             return;
 
-        auto & function_arguments_nodes = function_node->getArguments().getNodes();
+        auto & function_arguments_nodes = function_node->getMutableArguments();
         if (function_arguments_nodes.size() != 3)
             return;
 
