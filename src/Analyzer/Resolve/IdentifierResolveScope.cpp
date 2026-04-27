@@ -174,6 +174,22 @@ void IdentifierResolveScope::tryCacheIdentifier(
     if (!canCacheIdentifier(lookup, resolve_context))
         return;
 
+    /// Only cache node types that are expensive to clone (have children).
+    /// ColumnNode, ConstantNode, IdentifierNode are cheap O(1) clones — not worth
+    /// the COW complexity of sharing them.
+    auto node_type = result.resolved_identifier->getNodeType();
+    switch (node_type)
+    {
+        case QueryTreeNodeType::FUNCTION:
+        case QueryTreeNodeType::QUERY:
+        case QueryTreeNodeType::UNION:
+        case QueryTreeNodeType::LAMBDA:
+        case QueryTreeNodeType::LIST:
+            break;
+        default:
+            return;
+    }
+
     /// Don't cache nodes in `nullable_group_by_keys` — their type depends on context:
     /// non-nullable inside aggregate functions, nullable outside (see convertToNullable
     /// calls after resolution). Caching would return the wrong type for one context.
