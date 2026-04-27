@@ -44,7 +44,7 @@ public:
         if (!function_node->getResultType()->equals(DataTypeUInt64()))
             return;
 
-        auto & first_argument = function_node->getArguments().getNodes()[0];
+        auto & first_argument = function_node->getMutableArguments()[0];
         auto * first_argument_constant_node = first_argument->as<ConstantNode>();
         if (!first_argument_constant_node)
             return;

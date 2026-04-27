@@ -140,7 +140,7 @@ public:
             return;
 
         /// Check that query has only single node in projection
-        auto & projection_nodes = query_node->getProjection().getNodes();
+        auto & projection_nodes = query_node->getMutableProjection();
         if (projection_nodes.size() != 1)
             return;
 
@@ -154,7 +154,7 @@ public:
         if (!matchFnUniq(function_node->getFunctionName()))
             return;
 
-        auto & uniq_arguments_nodes = function_node->getArguments().getNodes();
+        auto & uniq_arguments_nodes = function_node->getMutableArguments();
 
         /// Whether query matches 'SELECT uniq(x ...) FROM (SELECT DISTINCT x ...)'
         auto match_subquery_with_distinct = [&]() -> bool

@@ -125,7 +125,7 @@ public:
 
             auto modified_if_node = function_node->clone();
             auto * function_if_node = modified_if_node->as<FunctionNode>();
-            auto & argument_nodes = function_if_node->getArguments().getNodes();
+            auto & argument_nodes = function_if_node->getMutableArguments();
 
             const auto * first_literal = argument_nodes[1]->as<ConstantNode>();
             const auto * second_literal = argument_nodes[2]->as<ConstantNode>();
@@ -152,7 +152,7 @@ public:
 
             auto modified_transform_node = function_node->clone();
             auto * function_modified_transform_node = modified_transform_node->as<FunctionNode>();
-            auto & argument_nodes = function_modified_transform_node->getArguments().getNodes();
+            auto & argument_nodes = function_modified_transform_node->getMutableArguments();
 
             if (!isString(removeNullable(function_node->getResultType())))
                 return;

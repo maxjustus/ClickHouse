@@ -58,7 +58,7 @@ public:
                 return false;
 
             /// Do not apply optimization if injective function contains multiple arguments
-            auto & arg_arguments_nodes = arg_typed->getArguments().getNodes();
+            auto & arg_arguments_nodes = arg_typed->getMutableArguments();
             if (arg_arguments_nodes.size() != 1)
                 return false;
 

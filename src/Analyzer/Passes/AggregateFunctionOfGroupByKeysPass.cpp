@@ -56,7 +56,7 @@ public:
         {
             QueryTreeNodePtrWithHashSet group_by_keys;
             bool first_grouping_set = true;
-            for (auto & group_key : query_node->getGroupBy().getNodes())
+            for (auto & group_key : query_node->getMutableGroupBy())
             {
                 /// For grouping sets case collect only keys that are presented in every set.
                 if (auto * list = group_key->as<ListNode>())
@@ -134,7 +134,7 @@ private:
             return false;
 
         std::vector<NodeWithInfo> candidates;
-        auto & function_arguments = function->getArguments().getNodes();
+        auto & function_arguments = function->getMutableArguments();
         if (function_arguments.size() != 1)
             throw Exception(ErrorCodes::LOGICAL_ERROR, "Expected a single argument of function '{}' but received {}", function->getFunctionName(), function_arguments.size());
 
@@ -156,7 +156,7 @@ private:
                 case QueryTreeNodeType::FUNCTION:
                 {
                     auto * func = candidate->as<FunctionNode>();
-                    auto & arguments = func->getArguments().getNodes();
+                    auto & arguments = func->getMutableArguments();
                     if (arguments.empty())
                         return false;
 

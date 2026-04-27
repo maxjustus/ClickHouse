@@ -28,7 +28,7 @@ public:
         if (function_node->getArguments().getNodes().size() != 3)
             return;
 
-        auto & first_argument = function_node->getArguments().getNodes()[0];
+        auto & first_argument = function_node->getMutableArguments()[0];
         const auto * first_argument_constant_node = first_argument->as<ConstantNode>();
         if (!first_argument_constant_node)
             return;

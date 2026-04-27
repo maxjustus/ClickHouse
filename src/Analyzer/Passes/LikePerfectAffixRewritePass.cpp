@@ -57,7 +57,7 @@ public:
         if (!(is_like || is_not_like))
             return;
 
-        auto & args = function_node->getArguments().getNodes();
+        auto & args = function_node->getMutableArguments();
         if (args.size() != 2)
             return;
 

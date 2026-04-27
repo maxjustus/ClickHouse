@@ -845,7 +845,7 @@ void QueryAnalyzer::expandGroupByAll(QueryNode & query_tree_node_typed)
     if (!query_tree_node_typed.isGroupByAll())
         return;
 
-    auto & group_by_nodes = query_tree_node_typed.getGroupBy().getNodes();
+    auto & group_by_nodes = query_tree_node_typed.getMutableGroupBy();
     auto & projection_list = query_tree_node_typed.getProjection();
 
     for (auto & node : projection_list.getNodes())
@@ -862,7 +862,7 @@ void QueryAnalyzer::expandOrderByAll(QueryNode & query_tree_node_typed, const Se
     if (!all_node)
         throw Exception(ErrorCodes::LOGICAL_ERROR, "Select analyze for not sort node.");
 
-    auto & projection_nodes = query_tree_node_typed.getProjection().getNodes();
+    auto & projection_nodes = query_tree_node_typed.getMutableProjection();
     auto list_node = std::make_shared<ListNode>();
     list_node->getNodes().reserve(projection_nodes.size());
 
@@ -907,8 +907,8 @@ void QueryAnalyzer::expandLimitByAll(QueryNode & query_tree_node_typed)
             "LIMIT BY ALL requires a limit expression. Use LIMIT n BY ALL");
     }
 
-    auto & limit_by_nodes = query_tree_node_typed.getLimitBy().getNodes();
-    auto & projection_nodes = query_tree_node_typed.getProjection().getNodes();
+    auto & limit_by_nodes = query_tree_node_typed.getMutableLimitBy();
+    auto & projection_nodes = query_tree_node_typed.getMutableProjection();
 
     limit_by_nodes.clear();
     limit_by_nodes.reserve(projection_nodes.size());
@@ -3488,7 +3488,7 @@ void QueryAnalyzer::resolveGroupByNode(QueryNode & query_node_typed, IdentifierR
 {
     if (query_node_typed.isGroupByWithGroupingSets())
     {
-        for (auto & grouping_sets_keys_list_node : query_node_typed.getGroupBy().getNodes())
+        for (auto & grouping_sets_keys_list_node : query_node_typed.getMutableGroupBy())
         {
             replaceNodesWithPositionalArguments(grouping_sets_keys_list_node, query_node_typed.getProjection().getNodes(), scope);
 
@@ -3518,7 +3518,7 @@ void QueryAnalyzer::resolveGroupByNode(QueryNode & query_node_typed, IdentifierR
 
         // Remove redundant calls to `tuple` function. It simplifies checking if expression is an aggregation key.
         // It's required to support queries like: SELECT number FROM numbers(3) GROUP BY (number, number % 2)
-        auto & group_by_list = query_node_typed.getGroupBy().getNodes();
+        auto & group_by_list = query_node_typed.getMutableGroupBy();
         expandTuplesInList(group_by_list);
 
         for (const auto & group_by_elem : query_node_typed.getGroupBy().getNodes())
@@ -4792,7 +4792,7 @@ void QueryAnalyzer::resolveJoin(QueryTreeNodePtr & join_node, IdentifierResolveS
                     if (projection_node->hasAlias() && identifier_full_name_ == projection_node->getAlias())
                     {
                         auto left_subquery = std::make_shared<QueryNode>(query_node->getMutableContext());
-                        left_subquery->getProjection().getNodes().push_back(projection_node->clone());
+                        left_subquery->getMutableProjection().push_back(projection_node->clone());
                         auto subquery_join_tree = left_table_expression;
                         if (subquery_join_tree->getNodeType() == QueryTreeNodeType::ARRAY_JOIN)
                             subquery_join_tree = subquery_join_tree->as<ArrayJoinNode &>().getTableExpression();
@@ -5057,7 +5057,7 @@ void QueryAnalyzer::inlineViewSubqueryIfNeeded(QueryTreeNodePtr & join_tree_node
 
         auto wrapper_context = Context::createCopy(scope.context);
         auto wrapper_query = std::make_shared<QueryNode>(std::move(wrapper_context));
-        wrapper_query->getProjection().getNodes() = std::move(projection_nodes);
+        wrapper_query->getMutableProjection() = std::move(projection_nodes);
         wrapper_query->resolveProjectionColumns(std::move(projection_columns));
         wrapper_query->getJoinTree() = view_query_tree;
         wrapper_query->setIsSubquery(true);
@@ -5111,7 +5111,7 @@ void QueryAnalyzer::inlineViewSubqueryIfNeeded(QueryTreeNodePtr & join_tree_node
 
         auto wrapper_context = Context::createCopy(scope.context);
         auto wrapper_query = std::make_shared<QueryNode>(std::move(wrapper_context));
-        wrapper_query->getProjection().getNodes() = std::move(projection_nodes);
+        wrapper_query->getMutableProjection() = std::move(projection_nodes);
         wrapper_query->resolveProjectionColumns(std::move(projection_columns));
         wrapper_query->getJoinTree() = result_node;
         wrapper_query->getWhere() = std::move(filter_node);
@@ -5721,7 +5721,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
       *
       * Example: SELECT count(*) OVER w FROM test_table WINDOW w AS (PARTITION BY id);
       */
-    query_node_typed.getWindow().getNodes().clear();
+    query_node_typed.getMutableWindow().clear();
 
     /// Remove aliases from expression and lambda nodes
 

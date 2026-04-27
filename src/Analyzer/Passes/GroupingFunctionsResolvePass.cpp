@@ -215,7 +215,7 @@ void resolveGroupingFunctions(QueryTreeNodePtr & query_node, ContextPtr context)
         }
         else
         {
-            for (auto & group_by_key_node : query_node_typed.getGroupBy().getNodes())
+            for (auto & group_by_key_node : query_node_typed.getMutableGroupBy())
             {
                 if (aggregation_key_to_index.contains(group_by_key_node))
                     continue;

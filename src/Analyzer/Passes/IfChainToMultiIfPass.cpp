@@ -40,7 +40,7 @@ public:
 
         std::vector<QueryTreeNodePtr> multi_if_arguments;
 
-        auto & function_node_arguments = function_node->getArguments().getNodes();
+        auto & function_node_arguments = function_node->getMutableArguments();
         multi_if_arguments.insert(multi_if_arguments.end(), function_node_arguments.begin(), function_node_arguments.end());
 
         QueryTreeNodePtr if_chain_node = multi_if_arguments.back();
@@ -56,7 +56,7 @@ public:
 
             multi_if_arguments.pop_back();
 
-            auto & if_chain_function_node_arguments = if_chain_function_node->getArguments().getNodes();
+            auto & if_chain_function_node_arguments = if_chain_function_node->getMutableArguments();
             multi_if_arguments.insert(multi_if_arguments.end(), if_chain_function_node_arguments.begin(), if_chain_function_node_arguments.end());
 
             /// Use last `multiIf` argument for next check

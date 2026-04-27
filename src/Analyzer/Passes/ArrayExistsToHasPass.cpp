@@ -47,7 +47,7 @@ public:
         if (!lambda_node)
             return;
 
-        auto & lambda_arguments_nodes = lambda_node->getArguments().getNodes();
+        auto & lambda_arguments_nodes = lambda_node->getMutableArguments();
         if (lambda_arguments_nodes.size() != 1)
             return;
 

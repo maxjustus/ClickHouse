@@ -58,7 +58,7 @@ public:
         }
 
         /// Collect GROUP BY keys.
-        auto & group_by_nodes = query->getGroupBy().getNodes();
+        auto & group_by_nodes = query->getMutableGroupBy();
         QueryTreeNodePtrWithHashSet group_by_keys;
         for (auto & key : group_by_nodes)
             group_by_keys.insert(QueryTreeNodePtrWithHash(key));

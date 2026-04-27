@@ -177,7 +177,7 @@ void optimizeFunctionArrayElementForMap(QueryTreeNodePtr & node, FunctionNode & 
 {
     /// Replace `m['key']` (which is internally `arrayElement(m, 'key')`) with the subcolumn `m.key_<serialized_key>`.
 
-    auto & function_arguments_nodes = function_node.getArguments().getNodes();
+    auto & function_arguments_nodes = function_node.getMutableArguments();
     if (function_arguments_nodes.size() != 2)
         return;
 
@@ -288,7 +288,7 @@ void optimizeTupleOrVariantElement(QueryTreeNodePtr & node, FunctionNode & funct
     /// Replace `tupleElement(tuple_argument, string_literal)`, `tupleElement(tuple_argument, integer_literal)` with `tuple_argument.column_name`.
     /// Replace `variantElement(variant_argument, string_literal)` with `variant_argument.column_name`.
 
-    auto & function_arguments_nodes = function_node.getArguments().getNodes();
+    auto & function_arguments_nodes = function_node.getMutableArguments();
     if (function_arguments_nodes.size() != 2)
         return;
 
@@ -538,7 +538,7 @@ std::tuple<FunctionNode *, ColumnNode *, TableNode *> getTypedNodesForOptimizati
     if (!function_node)
         return {};
 
-    auto & function_arguments_nodes = function_node->getArguments().getNodes();
+    auto & function_arguments_nodes = function_node->getMutableArguments();
     if (function_arguments_nodes.empty() || function_arguments_nodes.size() > 2)
         return {};
 
