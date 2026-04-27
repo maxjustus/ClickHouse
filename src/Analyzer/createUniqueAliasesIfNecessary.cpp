@@ -180,7 +180,7 @@ private:
     {
         if (result.empty())
         {
-            for (auto & array_join_expression : array_join->getJoinExpressions())
+            for (auto & array_join_expression : array_join->getMutableJoinExpressions())
             {
                 auto * array_join_column = array_join_expression->as<ColumnNode>();
                 chassert(array_join_column != nullptr);

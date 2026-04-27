@@ -49,7 +49,7 @@ public:
         /// If any ORDER BY element uses WITH FILL or COLLATE, do not optimize.
         /// Collation can make distinct GROUP BY key values compare equal,
         /// so tiebreaker expressions after them must be preserved.
-        auto & order_by_nodes = query->getOrderBy().getNodes();
+        auto & order_by_nodes = query->getMutableOrderBy();
         for (auto & sort_elem : order_by_nodes)
         {
             auto * sort_node = sort_elem->as<SortNode>();

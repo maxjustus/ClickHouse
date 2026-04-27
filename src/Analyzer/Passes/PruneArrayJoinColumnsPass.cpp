@@ -413,7 +413,7 @@ void PruneArrayJoinColumnsPass::run(QueryTreeNodePtr & query_tree_node, ContextP
         if (!array_join_node)
             continue;
 
-        auto & join_expressions = array_join_node->getJoinExpressions().getMutableNodes();
+        auto & join_expressions = array_join_node->getMutableJoinExpressions();
 
         /// 3a: Remove entire unused ARRAY JOIN expressions.
         {

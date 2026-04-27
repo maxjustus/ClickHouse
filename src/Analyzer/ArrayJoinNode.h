@@ -61,10 +61,12 @@ public:
         return children[join_expressions_child_index]->as<const ListNode &>();
     }
 
-    /// Get join expressions
-    ListNode & getJoinExpressions()
+    QueryTreeNodes & getMutableJoinExpressions()
     {
-        return children[join_expressions_child_index]->as<ListNode &>();
+        auto & node = children[join_expressions_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
     }
 
     /// Get join expressions node

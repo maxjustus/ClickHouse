@@ -49,10 +49,12 @@ public:
         return children[arguments_child_index]->as<const ListNode &>();
     }
 
-    /// Get arguments
-    ListNode & getArguments()
+    QueryTreeNodes & getMutableArguments()
     {
-        return children[arguments_child_index]->as<ListNode &>();
+        auto & args_node = children[arguments_child_index];
+        if (args_node.use_count() > 1)
+            args_node = args_node->clone();
+        return args_node->as<ListNode &>().getMutableNodes();
     }
 
     /// Get arguments node

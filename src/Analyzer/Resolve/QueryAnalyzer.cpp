@@ -2723,7 +2723,7 @@ ProjectionNames QueryAnalyzer::resolveLambda(const QueryTreeNodePtr & lambda_nod
     IdentifierResolveScope & scope)
 {
     auto & lambda_to_resolve = lambda_node_to_resolve->as<LambdaNode &>();
-    auto & lambda_arguments_nodes = lambda_to_resolve.getArguments().getNodes();
+    const auto & lambda_arguments_nodes = lambda_to_resolve.getArguments().getNodes();
     size_t lambda_arguments_nodes_size = lambda_arguments_nodes.size();
 
     /** Register lambda as being resolved, to prevent recursive lambdas resolution.
@@ -2783,7 +2783,7 @@ ProjectionNames QueryAnalyzer::resolveLambda(const QueryTreeNodePtr & lambda_nod
         lambda_new_arguments_nodes.push_back(lambda_arguments[i]);
     }
 
-    lambda_to_resolve.getArguments().getNodes() = std::move(lambda_new_arguments_nodes);
+    lambda_to_resolve.getMutableArguments() = std::move(lambda_new_arguments_nodes);
 
     /// Lambda body expression is resolved as standard query expression node.
     auto result_projection_names = resolveExpressionNode(lambda_to_resolve.getExpression(), scope, false /*allow_lambda_expression*/, false /*allow_table_expression*/);
@@ -4038,7 +4038,7 @@ void QueryAnalyzer::resolveTableFunction(QueryTreeNodePtr & table_function_node,
 
     auto skip_analysis_arguments_indexes = table_function_ptr->skipAnalysisForArguments(table_function_node, scope_context);
 
-    auto & table_function_arguments = table_function_node_typed.getArguments().getNodes();
+    auto & table_function_arguments = table_function_node_typed.getMutableArguments();
     size_t table_function_arguments_size = table_function_arguments.size();
 
     for (size_t table_function_argument_index = 0; table_function_argument_index < table_function_arguments_size; ++table_function_argument_index)
@@ -4169,7 +4169,7 @@ void QueryAnalyzer::resolveTableFunction(QueryTreeNodePtr & table_function_node,
         }
     }
 
-    table_function_node_typed.getArguments().getNodes() = std::move(result_table_function_arguments);
+    table_function_arguments = std::move(result_table_function_arguments);
 
     auto table_function_ast = table_function_node_typed.toAST();
     table_function_ptr->parseArguments(table_function_ast, scope_context);
@@ -4372,7 +4372,7 @@ void QueryAnalyzer::resolveArrayJoin(QueryTreeNodePtr & array_join_node, Identif
 
     /// Wrap array join expressions into column nodes, where array join expression is inner expression
 
-    auto & array_join_nodes = array_join_node_typed.getJoinExpressions().getNodes();
+    auto & array_join_nodes = array_join_node_typed.getMutableJoinExpressions();
     size_t array_join_nodes_size = array_join_nodes.size();
 
     if (array_join_nodes_size == 0)
@@ -5441,9 +5441,9 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
 
     /// Register CTE subqueries and remove them from WITH section
 
-    auto & with_nodes = query_node_typed.getWith().getNodes();
+    const auto & with_nodes = query_node_typed.getWith().getNodes();
 
-    for (auto & node : with_nodes)
+    for (const auto & node : with_nodes)
     {
         auto * subquery_node = node->as<QueryNode>();
         auto * union_node = node->as<UnionNode>();
@@ -5466,7 +5466,7 @@ void QueryAnalyzer::resolveQuery(const QueryTreeNodePtr & query_node, Identifier
       *
       * Example: WITH 1 AS constant, (x -> x + 1) AS lambda, a AS (SELECT * FROM test_table);
       */
-    query_node_typed.getWith().getNodes().clear();
+    query_node_typed.getMutableWith().clear();
 
     for (auto & window_node : query_node_typed.getWindow().getNodes())
     {

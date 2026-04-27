@@ -77,10 +77,12 @@ public:
         return children[order_by_child_index]->as<const ListNode &>();
     }
 
-    /// Get order by
-    ListNode & getOrderBy()
+    QueryTreeNodes & getMutableOrderBy()
     {
-        return children[order_by_child_index]->as<ListNode &>();
+        auto & node = children[order_by_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
     }
 
     /// Get order by node
@@ -107,10 +109,12 @@ public:
         return children[partition_by_child_index]->as<const ListNode &>();
     }
 
-    /// Get partition by
-    ListNode & getPartitionBy()
+    QueryTreeNodes & getMutablePartitionBy()
     {
-        return children[partition_by_child_index]->as<ListNode &>();
+        auto & node = children[partition_by_child_index];
+        if (node.use_count() > 1)
+            node = node->clone();
+        return node->as<ListNode &>().getMutableNodes();
     }
 
     /// Get partition by node
