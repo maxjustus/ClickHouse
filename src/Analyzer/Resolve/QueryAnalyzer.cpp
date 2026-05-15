@@ -1361,9 +1361,10 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     IdentifierResolveScope & scope,
     IdentifierResolveContext identifier_resolve_context)
 {
-    const bool inside_subquery_function = scope.expressions_in_resolve_process_stack.isInsideSubqueryFunction();
+    IdentifierLookup cache_lookup = identifier_lookup;
+    cache_lookup.subquery_function_instance_id = scope.expressions_in_resolve_process_stack.getSubqueryFunctionInstanceId();
 
-    auto it = scope.identifier_in_lookup_process.find(identifier_lookup);
+    auto it = scope.identifier_in_lookup_process.find(cache_lookup);
 
     bool already_in_resolve_process = false;
     if (it != scope.identifier_in_lookup_process.end())
@@ -1373,14 +1374,11 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     }
     else
     {
-        if (!inside_subquery_function)
-        {
-            auto cached_result = scope.findCachedIdentifier(identifier_lookup, identifier_resolve_context);
-            if (cached_result)
-                return *cached_result;
-        }
+        auto cached_result = scope.findCachedIdentifier(cache_lookup, identifier_resolve_context);
+        if (cached_result)
+            return *cached_result;
 
-        auto [insert_it, _] = scope.identifier_in_lookup_process.insert({identifier_lookup, IdentifierResolveState()});
+        auto [insert_it, _] = scope.identifier_in_lookup_process.insert({cache_lookup, IdentifierResolveState()});
         it = insert_it;
     }
 
@@ -1493,8 +1491,8 @@ IdentifierResolveResult QueryAnalyzer::tryResolveIdentifier(const IdentifierLook
     if (it->second.count == 0)
     {
         scope.identifier_in_lookup_process.erase(it);
-        if (resolve_result.resolved_identifier && !inside_subquery_function)
-            scope.tryCacheIdentifier(identifier_lookup, resolve_result, identifier_resolve_context);
+        if (resolve_result.resolved_identifier)
+            scope.tryCacheIdentifier(cache_lookup, resolve_result, identifier_resolve_context);
     }
 
     return resolve_result;
