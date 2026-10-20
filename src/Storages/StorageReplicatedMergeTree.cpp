@@ -10409,6 +10409,21 @@ bool StorageReplicatedMergeTree::dropPartImpl(
             return false;
         }
 
+        /// A replica that has not fetched the patch part cannot execute the mutations that apply it.
+        /// The DROP_PART would block its fetch of the patch part forever.
+        if (part_info.isPatch())
+        {
+            if (String replica = findReplicaMissingPart(*zookeeper, part_name); !replica.empty())
+            {
+                if (throw_if_noop)
+                    throw Exception(
+                        ErrorCodes::PART_IS_TEMPORARILY_LOCKED, "Patch part {} is not fetched by replica {} yet. Cannot drop", part_name, replica);
+
+                LOG_DEBUG(log, "Cannot drop patch part {} because replica {} has not fetched it yet", part_name, replica);
+                return false;
+            }
+        }
+
         if (detach && supportsLightweightUpdate())
         {
             auto patch_parts = getPatchPartsVectorForPartition(part_info.getPartitionId());
@@ -10462,6 +10477,32 @@ bool StorageReplicatedMergeTree::dropPartImpl(
         LOG_TRACE(log, "DROP RANGE for part {} inserted with znode name {}", part_name, entry.znode_name);
         return true;
     }
+}
+
+String StorageReplicatedMergeTree::findReplicaMissingPart(zkutil::ZooKeeper & zookeeper, const String & part_name) const
+{
+    Strings replicas = zookeeper.getChildren(fs::path(zookeeper_path) / "replicas");
+
+    Strings paths;
+    for (const String & replica : replicas)
+    {
+        paths.emplace_back(fs::path(zookeeper_path) / "replicas" / replica / "is_lost");
+        paths.emplace_back(fs::path(zookeeper_path) / "replicas" / replica / "parts" / part_name);
+    }
+
+    auto responses = zookeeper.tryGet(paths);
+
+    for (size_t i = 0; i < replicas.size(); ++i)
+    {
+        const auto & is_lost = responses[2 * i];
+        if (is_lost.error == Coordination::Error::ZOK && is_lost.data == "1")
+            continue;
+
+        if (responses[2 * i + 1].error != Coordination::Error::ZOK)
+            return replicas[i];
+    }
+
+    return {};
 }
 
 bool StorageReplicatedMergeTree::addOpsToDropAllPartsInPartition(

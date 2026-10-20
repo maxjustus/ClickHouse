@@ -971,6 +971,9 @@ private:
     /// and don't use any explicit locking mechanism for merges.
     bool dropPartImpl(zkutil::ZooKeeperPtr & zookeeper, String part_name, LogEntry & entry, bool detach, bool throw_if_noop);
 
+    /// Returns a replica that is not lost and does not have the part, or an empty string.
+    String findReplicaMissingPart(zkutil::ZooKeeper & zookeeper, const String & part_name) const;
+
     /// Check granularity of already existing replicated table in zookeeper if it exists
     /// return true if it's fixed
     bool checkFixedGranularityInZookeeper(const ZooKeeperRetriesInfo & zookeeper_retries_info);
